@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>HS2StudioBrowser.Scenes</AssemblyName>
+    <RootNamespace>HS2StudioBrowser.Scenes</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Core\HS2StudioBrowser.Core.csproj" />
+  </ItemGroup>
+</Project>

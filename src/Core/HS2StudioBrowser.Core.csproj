@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Shared library: window, folder tree, thumbnails, favorites, file operations, missing-zipmod check. Not a plugin by itself. -->
+  <PropertyGroup>
+    <AssemblyName>HS2StudioBrowser.Core</AssemblyName>
+    <RootNamespace>HS2StudioBrowser</RootNamespace>
+  </PropertyGroup>
+</Project>

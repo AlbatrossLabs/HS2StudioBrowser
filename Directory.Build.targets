@@ -1,0 +1,7 @@
+<Project>
+  <Target Name="DeployToHS2" AfterTargets="Build" Condition="'$(Deploy)' == 'true' And '$(HS2Dir)' != '' And Exists('$(BepInEx)\plugins')">
+    <MakeDir Directories="$(DeployDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DeployDir)" />
+    <Message Importance="high" Text="Deployed $(TargetFileName) to $(DeployDir)" />
+  </Target>
+</Project>

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>HS2StudioBrowser.Poses</AssemblyName>
+    <RootNamespace>HS2StudioBrowser.Poses</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Core\HS2StudioBrowser.Core.csproj" />
+  </ItemGroup>
+</Project>

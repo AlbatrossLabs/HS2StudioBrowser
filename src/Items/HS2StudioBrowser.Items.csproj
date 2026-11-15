@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>HS2StudioBrowser.Items</AssemblyName>
+    <RootNamespace>HS2StudioBrowser.Items</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Core\HS2StudioBrowser.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- For rendering item thumbnails: keeping item sounds quiet and framing particle effects. -->
+    <Reference Include="$(Managed)\UnityEngine.AudioModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.ParticleSystemModule.dll" Private="false" />
+  </ItemGroup>
+</Project>

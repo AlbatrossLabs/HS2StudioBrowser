@@ -1,0 +1,53 @@
+<Project>
+  <!-- Shared by every project in the repo. -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <OutputPath>$(MSBuildThisFileDirectory)bin\$(Configuration)\</OutputPath>
+    <DebugType>embedded</DebugType>
+    <Version>0.15.0</Version>
+    <Authors>Albatross Labs</Authors>
+
+    <!--
+      The game install. References are read from it (so they always match what you run), and every build
+      copies the DLLs to BepInEx\plugins\HS2StudioBrowser\ there.
+        dotnet build -c Release -p:HS2Dir="D:\Games\HoneySelect2"
+      Add -p:Deploy=false to build without copying.
+    -->
+    <HS2Dir Condition="'$(HS2Dir)' == ''">X:\HS2 RX15</HS2Dir>
+    <Deploy Condition="'$(Deploy)' == ''">true</Deploy>
+    <Managed>$(HS2Dir)\StudioNEOV2_Data\Managed</Managed>
+    <BepInEx>$(HS2Dir)\BepInEx</BepInEx>
+    <DeployDir>$(BepInEx)\plugins\HS2StudioBrowser</DeployDir>
+  </PropertyGroup>
+
+  <!-- .NET Framework reference assemblies from NuGet (skipped when FrameworkPathOverride points at a local copy). -->
+  <ItemGroup Condition="'$(FrameworkPathOverride)' == ''">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="$(BepInEx)\core\BepInEx.dll" Private="false" />
+    <Reference Include="$(BepInEx)\core\0Harmony.dll" Private="false" />
+    <Reference Include="$(BepInEx)\plugins\HS2API.dll" Private="false" />
+    <Reference Include="$(BepInEx)\plugins\HS2_BepisPlugins\HS2_Sideloader.dll" Private="false" />
+    <Reference Include="$(BepInEx)\plugins\HS2_BepisPlugins\HS2_ExtensibleSaveFormat.dll" Private="false" />
+    <Reference Include="$(Managed)\Assembly-CSharp.dll" Private="false" />
+    <Reference Include="$(Managed)\Assembly-CSharp-firstpass.dll" Private="false" />
+    <Reference Include="$(Managed)\IL.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.IMGUIModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.ImageConversionModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.InputModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.TextRenderingModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.UI.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.UIModule.dll" Private="false" />
+    <Reference Include="$(Managed)\Unity.TextMeshPro.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.AnimationModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.PhysicsModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.AssetBundleModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UniRx.dll" Private="false" />
+  </ItemGroup>
+</Project>
