@@ -6,43 +6,43 @@ Studio Browser replaces Honey Select 2 Studio's plain text lists with browsers y
 
 By **Albatross Labs**.
 
-![Studio Browser](docs/gifs/overview.gif)
+<!-- ![Studio Browser](docs/gifs/overview.gif) -->
 
 ## Outfits
 
 Every outfit as a picture, with the folder tree on the left. Load the whole outfit, or only its clothes or only its accessories, onto the selected characters. Outfits that need zipmods you don't have get a red badge naming the missing mods.
 
-![Outfits](docs/gifs/outfits.gif)
+![Outfits](docs/gifs/OutFitBrowser.gif)
 
 ## Characters
 
 Your character cards as pictures, split female / male. **Load** adds a character to the scene; **Change** swaps the selected character for this one and keeps their place and pose. Filter by height or bust size, worked out from each card.
 
-![Characters](docs/gifs/characters.gif)
+![Characters](docs/gifs/CharactersBrowser.webp)
 
 ## Scenes
 
 Stands in for Studio's Load screen, with every subfolder browsable. Load or Import a scene, filter by who's in it (FF, MMF, 4+...), and scenes go to the Recycle Bin when deleted.
 
-![Scenes](docs/gifs/scenes.gif)
+![Scenes](docs/gifs/SceneBrowser.gif)
 
 ## Poses
 
 Pose pictures in a grid, `.dat` poses included. Use the arrow keys to try each pose on the selected character, and Backspace to put back the pose they had. **Picture** gives a pose a picture of the current view, and **No picture** lists every pose still missing one.
 
-![Poses](docs/gifs/poses.gif)
+![Poses](docs/gifs/PoseBrowser.webp)
 
 ## Animations
 
 Every animation in the game and your zipmods, searchable in one list. Each one shows how long it runs and flags the ones that are really a held pose. Studio's speed, pattern and loop controls are built in, plus a timeline to scrub to any frame.
 
-![Animations](docs/gifs/animations.gif)
+![Animations](docs/gifs/AnimBrowser.webp)
 
 ## Items
 
 Studio's items as a grid of pictures, reusing Quick Access Box's thumbnails and making the missing ones. **Add** puts an item in the scene and **Add inside** puts it in the selected folder. You can give items your own names, and mark the ones you don't want so whole zipmods can be cleared out safely.
 
-![Items](docs/gifs/items.gif)
+<!-- ![Items](docs/gifs/items.gif) -->
 
 ## In every browser
 
@@ -53,7 +53,7 @@ Studio's items as a grid of pictures, reusing Quick Access Box's thumbnails and 
 - **Rename and move** cards from the browser. The name inside the card changes too, and the rest of the card is left byte for byte.
 - **Safe deleting:** cards go to the Recycle Bin, and nothing is ever deleted outright.
 
-![Tags](docs/gifs/tags.gif)
+<!-- ![Tags](docs/gifs/tags.gif) -->
 
 ## Install
 

@@ -2,3 +2,8 @@ bin/
 obj/
 *.user
 .vs/
+
+# Source recordings: too big for the repo (the README uses the .webp versions)
+docs/gifs/AnimBrowser.gif
+docs/gifs/CharactersBrowser.gif
+docs/gifs/PoseBrowser.gif
