@@ -41,6 +41,11 @@ namespace HS2StudioBrowser.UI
         private Vector2 _reportScroll;
         private List<ReportRow> _report;
         private int DialogId => WindowId + 5;
+
+        // Bars that wrap onto more rows when the window is narrow.
+        private readonly Flow _topFlow = new Flow(), _filterFlow = new Flow(), _footFlow = new Flow();
+        private readonly TagPanel _details = new TagPanel();
+        private float BarWidth => _rect.width - 20;
         private readonly HashSet<string> _expanded = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<Action> _pending = new List<Action>();
 
@@ -430,11 +435,13 @@ namespace HS2StudioBrowser.UI
             DrawTree();
             GUILayout.Space(6);
             DrawList();
+            GUILayout.Space(6);
+            DrawDetails();
             GUILayout.EndHorizontal();
             if (_kind.HasControls)
             {
                 GUILayout.Space(4);
-                _kind.DrawControls();
+                _kind.DrawControls(BarWidth);
             }
             GUILayout.Space(4);
             DrawFooter();
@@ -447,7 +454,11 @@ namespace HS2StudioBrowser.UI
 
         private void DrawTopBar()
         {
-            GUILayout.BeginHorizontal();
+            var f = _topFlow;
+            var skin = Theme.Skin;
+            f.Begin(BarWidth);
+            f.Next(Flow.Size("Search", Styles.Small) + Flow.Fixed(200, skin.textField)
+                + (_search?.Length > 0 ? Flow.Fixed(22) : 0) + (Searching ? Flow.Size(Theme.Hint($"in all {_total} {_kind.Nouns}"), Theme.RichSingle) : 0));
             GUILayout.Label("Search", Styles.Small, GUILayout.ExpandWidth(false));
 
             // Down or Enter in the search box goes to the list.
@@ -471,9 +482,10 @@ namespace HS2StudioBrowser.UI
             if (_search.Length > 0 && GUILayout.Button("x", GUILayout.Width(22))) _search = "";
             if (Searching) GUILayout.Label(Theme.Hint($"in all {_total} {_kind.Nouns}"), Theme.RichSingle, GUILayout.ExpandWidth(false));
 
-            GUILayout.FlexibleSpace();
+            f.Spring();
             if (_kind.HasPictures && _p.GridView != null)
             {
+                f.Next(Flow.Size("Grid", skin.toggle) + (_p.GridView.Value ? Flow.Fixed(70, skin.horizontalSlider) : 0) + 8, true);
                 var grid = GUILayout.Toggle(_p.GridView.Value, new GUIContent("Grid", $"Show the {_kind.Nouns} as pictures (off: a list of names)"), GUILayout.ExpandWidth(false));
                 if (grid != _p.GridView.Value)
                 {
@@ -488,12 +500,14 @@ namespace HS2StudioBrowser.UI
                 GUILayout.Space(8);
             }
             var tagLabel = _filter.Count > 0 ? $"Tags ({_filter.Count})" : "Tags";
+            f.Next(Flow.Fixed(_filter.Count > 0 ? 68 : 48) + 8, true);
             if (GUILayout.Button(new GUIContent(tagLabel, $"Show only {_kind.Nouns} with certain tags (opens the tag wheel)"), _filter.Count > 0 ? Theme.Primary : Theme.Skin.button, GUILayout.Width(_filter.Count > 0 ? 68 : 48)))
             {
                 var at = GUIUtility.GUIToScreenPoint(Event.current.mousePosition);
                 Later(() => _radial.ShowFilter(at));
             }
             GUILayout.Space(8);
+            f.Next(Flow.Size("Sort", Styles.Small) + Flow.Fixed(58, Theme.Choice) + Flow.Fixed(50, Theme.Choice) + 8, true);
             GUILayout.Label("Sort", Styles.Small, GUILayout.ExpandWidth(false));
             if (GUILayout.Toggle(_p.ItemSortBy.Value == ItemSort.StudioOrder, new GUIContent("Studio", "In the order Studio lists them"), Theme.Choice, GUILayout.Width(58)))
                 _p.ItemSortBy.Value = ItemSort.StudioOrder;
@@ -502,32 +516,41 @@ namespace HS2StudioBrowser.UI
 
             GUILayout.Space(8);
             var verb = _kind.Verb.ToLowerInvariant();
+            f.Next(Flow.Size($"{_kind.Verb} on click", skin.toggle) + 6, true);
             var play = GUILayout.Toggle(_p.PlayOnClick.Value, new GUIContent($"{_kind.Verb} on click",
                 _kind.RunOnStep ? $"Clicking a {_kind.Noun} or stepping with the arrow keys {verb}s it. Off: double-click or Enter {verb}s."
                     : $"Clicking a {_kind.Noun} {verb}s it. Off: double-click or Enter {verb}s. The arrow keys only move through the list."), GUILayout.ExpandWidth(false));
             if (play != _p.PlayOnClick.Value) _p.PlayOnClick.Value = play;
 
             GUILayout.Space(6);
+            f.Next(Flow.Fixed(64), true);
             if (GUILayout.Button(new GUIContent("Refresh", $"Read the {_kind.Nouns} again"), GUILayout.Width(64)))
                 Later(Rebuild);
-            GUILayout.EndHorizontal();
+            f.End();
         }
 
         private void DrawFilterBar()
         {
             if (_filter.Count == 0) return;
             GUILayout.Space(3);
-            GUILayout.BeginHorizontal();
+            var f = _filterFlow;
+            f.Begin(BarWidth);
+            f.Next(Flow.Size(Theme.Hint("Tagged"), Theme.RichSingle));
             GUILayout.Label(Theme.Hint("Tagged"), Theme.RichSingle, GUILayout.ExpandWidth(false));
             foreach (var tag in _filter.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList())
             {
                 var t = tag;
-                if (GUILayout.Button(new GUIContent(t.Replace(":", ": ") + "  x", "Remove this from the filter"), Theme.Choice, GUILayout.ExpandWidth(false)))
+                var chip = new GUIContent(t.Replace(":", ": ") + "  x", "Remove this from the filter");
+                f.Next(Flow.Size(chip, Theme.Choice));
+                if (GUILayout.Button(chip, Theme.Choice, GUILayout.ExpandWidth(false)))
                     Later(() => _filter.Remove(t));
             }
+            f.Next(Flow.Fixed(50));
             if (GUILayout.Button(new GUIContent("Clear", "Show everything again"), GUILayout.Width(50))) Later(() => _filter.Clear());
-            GUILayout.Label(Theme.Hint($"in all {_total} {_kind.Nouns}"), Theme.RichSingle, GUILayout.ExpandWidth(true));
-            GUILayout.EndHorizontal();
+            var hint = Theme.Hint($"in all {_total} {_kind.Nouns}");
+            f.Next(Flow.Size(hint, Theme.RichSingle));
+            GUILayout.Label(hint, Theme.RichSingle, GUILayout.ExpandWidth(true));
+            f.End();
         }
 
         /// <summary>The item's own tags plus the ones the kind works out (length...).</summary>
@@ -566,6 +589,36 @@ namespace HS2StudioBrowser.UI
                 return;
             }
             _radial.ShowTag(screen, new List<string> { key });
+        }
+
+        // ---------------------------------------------------------------- details panel (right)
+
+        private void DrawDetails()
+        {
+            var w = TagPanel.WidthFor(_rect.width);
+            var tree = _p.ShowFolders.Value ? TreeWidth : 24;
+            // Too narrow for it next to the list: fold it (without changing the setting).
+            if (!_p.ShowDetails.Value || _rect.width - 20 - tree - w - 12 < 220)
+            {
+                TagPanel.DrawFolded(() => _p.ShowDetails.Value = true);
+                return;
+            }
+            TagPanel.Selection sel = null;
+            if (_selected != null && _byKey.TryGetValue(_selected, out var item))
+            {
+                var renamed = _names.Get(item.Key) != null;
+                sel = new TagPanel.Selection
+                {
+                    Targets = new List<string> { item.Key },
+                    Title = (_marked.Contains(item.Key) ? Theme.Error("Marked for deletion") + "\n" : "") + DisplayName(item),
+                    Subtitle = Theme.Hint((renamed ? $"originally {item.Name}\n" : "") + $"{item.Category.Group.Name} › {item.Category.Name}" + (string.IsNullOrEmpty(item.Source) ? "" : "\n" + item.Source)),
+                    Picture = _kind.HasPictures ? _kind.Picture(item) : null,
+                    Auto = _kind.AutoFacets != null ? _kind.AutoTags(item) : null,
+                    Noun = _kind.Noun,
+                };
+            }
+            else sel = new TagPanel.Selection { Noun = _kind.Noun };
+            _details.Draw(w, _tagSet, _tags, sel, () => _viewKey = null, () => _p.ShowDetails.Value = false);
         }
 
         // ---------------------------------------------------------------- left panel
@@ -1104,15 +1157,21 @@ namespace HS2StudioBrowser.UI
         private void DrawFooter()
         {
             var view = View();
-            GUILayout.BeginHorizontal();
+            var f = _footFlow;
+            f.Begin(BarWidth);
             var info = $"{view.Count} {(view.Count == 1 ? _kind.Noun : _kind.Nouns)}";
             if (_favs.Count > 0) info += $"  ·  {_favs.Count} favorite{(_favs.Count == 1 ? "" : "s")}";
+            f.Next(Flow.Size(info, Styles.Small) + 10);
             GUILayout.Label(info, Styles.Small, GUILayout.ExpandWidth(false));
             GUILayout.Space(10);
             var pics = Grid ? _kind.PictureStatus : null;
-            GUILayout.Label(_kind.TargetLine() + (pics != null ? Theme.Hint("  ·  " + pics) : ""), Theme.RichSingle, GUILayout.ExpandWidth(true));
+            var target = _kind.TargetLine() + (pics != null ? Theme.Hint("  ·  " + pics) : "");
+            f.Next(Mathf.Min(Flow.Size(target, Theme.RichSingle), BarWidth));
+            GUILayout.Label(target, Theme.RichSingle, GUILayout.ExpandWidth(true));
 
-            if (_scope == Scope.Marked && !Searching && _marked.Count > 0)
+            var report = _scope == Scope.Marked && !Searching && _marked.Count > 0;
+            f.Next((report ? Flow.Fixed(110) + 6 : 0) + Flow.Fixed(66) + Flow.Fixed(62) + 6 + _kind.Actions.Sum(a => Flow.Fixed(a.Width)), true);
+            if (report)
             {
                 if (GUILayout.Button(new GUIContent("Deletion report", "Which zipmods these come from, and which can be removed"), GUILayout.Width(110)))
                     Later(OpenReport);
@@ -1142,7 +1201,7 @@ namespace HS2StudioBrowser.UI
                     Later(() => Run(act, key));
             }
             GUI.enabled = was;
-            GUILayout.EndHorizontal();
+            f.End();
 
             string line;
             if (_status != null && Time.unscaledTime < _statusUntil) line = _statusError ? Theme.Error(_status) : _status;

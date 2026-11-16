@@ -86,6 +86,8 @@ namespace HS2StudioBrowser.Items
                 StudioNames.Apply(item.Key, info, name);
         }
 
+        public override bool AddsToScene => true;
+
         public override string Id => "items";
         public override string Title => "Item Browser";
         public override string Noun => "item";
@@ -128,7 +130,7 @@ namespace HS2StudioBrowser.Items
             var name = _names.TryGetValue(key, out var n) ? n : "item";
             try
             {
-                return ItemPanel.Add(ids.Group, ids.Category, ids.No)
+                return ItemPanel.Add(ids.Group, ids.Category, ids.No, KeepAddMenuOpen())
                     ? ActionResult.Ok($"Added {name}")
                     : ActionResult.Fail($"Studio couldn't add {name} (its zipmod may be missing a file).");
             }

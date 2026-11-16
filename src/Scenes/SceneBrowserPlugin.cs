@@ -15,7 +15,7 @@ namespace HS2StudioBrowser.Scenes
     {
         public const string Guid = "com.albatrosslabs.hs2.studiobrowser.scenes";
         public const string PluginName = "Studio Browser: Scenes";
-        public const string Version = "0.16.0";
+        public const string Version = "0.17.2";
 
         internal ConfigEntry<bool> CloseAfterLoading;
         internal ConfigEntry<bool> SyncSaveFolder;

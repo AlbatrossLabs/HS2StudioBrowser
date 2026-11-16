@@ -61,7 +61,8 @@ namespace HS2StudioBrowser.Animations
         public override string Title => "Animation Browser";
         public override string Noun => "animation";
         public override string Nouns => "animations";
-        public override string StudioListName => "Anime list";
+        public override string StudioListName => "Anim list";
+        public override string[] OldStudioListNames => new[] { "Anime list" };
         public override IList<CardAction> Actions => _actions;
 
         public override List<ItemGroup> BuildCatalog()
@@ -134,7 +135,7 @@ namespace HS2StudioBrowser.Animations
         private readonly AnimeControls _controls = new AnimeControls();
 
         public override bool HasControls => _plugin.ShowControls.Value;
-        public override void DrawControls() => _controls.Draw(_plugin);
+        public override void DrawControls(float width) => _controls.Draw(_plugin, width);
 
         public override void OnUpdate(bool replacing)
         {

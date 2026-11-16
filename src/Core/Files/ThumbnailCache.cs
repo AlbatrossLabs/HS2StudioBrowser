@@ -34,6 +34,8 @@ namespace HS2StudioBrowser.Files
 
         public int Capacity = 300;
         public int PerFrame = 6;
+        /// <summary>Pictures wider than this are scaled down when loaded (thumbnails never show bigger), to keep video memory in check.</summary>
+        public int MaxWidth = 512;
 
         /// <summary>The texture for a card, or null while it loads. Asks for it if needed.</summary>
         public Texture2D Get(string path, DateTime modified)
@@ -89,7 +91,7 @@ namespace HS2StudioBrowser.Files
                 if (next.Value != null)
                 {
                     var tex = new Texture2D(2, 2, TextureFormat.ARGB32, false) { wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.DontSave };
-                    if (tex.LoadImage(next.Value, true)) item.Texture = tex;
+                    if (tex.LoadImage(next.Value, true)) item.Texture = Shrink(tex);
                     else { UnityEngine.Object.Destroy(tex); item.Failed = true; }
                 }
                 else item.Failed = true;
@@ -99,6 +101,36 @@ namespace HS2StudioBrowser.Files
             }
 
             Trim();
+        }
+
+        /// <summary>A copy no wider than <see cref="MaxWidth"/> (the original is freed), or the texture itself when it's small enough.</summary>
+        private Texture2D Shrink(Texture2D tex)
+        {
+            if (tex.width <= MaxWidth) return tex;
+            var w = MaxWidth;
+            var h = Mathf.Max(1, Mathf.RoundToInt(tex.height * (float)MaxWidth / tex.width));
+            var was = RenderTexture.active;
+            var rt = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            try
+            {
+                tex.filterMode = FilterMode.Bilinear;
+                Graphics.Blit(tex, rt);
+                RenderTexture.active = rt;
+                var small = new Texture2D(w, h, TextureFormat.ARGB32, false) { wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.DontSave };
+                small.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+                small.Apply(false, true);
+                UnityEngine.Object.Destroy(tex);
+                return small;
+            }
+            catch
+            {
+                return tex;
+            }
+            finally
+            {
+                RenderTexture.active = was;
+                RenderTexture.ReleaseTemporary(rt);
+            }
         }
 
         /// <summary>Forget one card (renamed, moved, deleted).</summary>

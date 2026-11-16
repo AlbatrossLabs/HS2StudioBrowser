@@ -52,6 +52,13 @@ namespace HS2StudioBrowser
         /// <summary>Extra controls at the end of the top bar (inside the window). Return true to re-read the folder.</summary>
         public virtual bool DrawTopBarExtras() => false;
 
+        /// <summary>True while the kind wants every subfolder's cards shown (e.g. a "needs a picture" view).</summary>
+        public virtual bool ForceSubfolders => false;
+        /// <summary>Width of what <see cref="DrawTopBarExtras"/> draws (so the bar can wrap before it).</summary>
+        public virtual float TopBarExtrasWidth => 0;
+        /// <summary>Width of what <see cref="DrawFooterExtras"/> draws.</summary>
+        public virtual float FooterExtrasWidth => 0;
+
         /// <summary>Extra controls in the footer, between the target line and the action buttons.</summary>
         public virtual void DrawFooterExtras() { }
 

@@ -73,13 +73,19 @@ namespace HS2StudioBrowser.Characters
 
         private static List<OCIChar> Selected(int sex) => StudioTargets.Characters().Where(c => c.oiCharInfo.sex == sex).ToList();
 
-        private static ActionResult Add(string path, int sex)
+        public override bool AddsToScene => true;
+
+        private ActionResult Add(string path, int sex)
         {
             if (!File.Exists(path)) return ActionResult.Fail("That file is gone.");
             try
             {
-                if (sex == 0) Studio.Studio.Instance.AddMale(path);
-                else Studio.Studio.Instance.AddFemale(path);
+                AddMenuHold.Run(KeepAddMenuOpen(), () =>
+                {
+                    if (sex == 0) Studio.Studio.Instance.AddMale(path);
+                    else Studio.Studio.Instance.AddFemale(path);
+                    return 0;
+                });
                 return ActionResult.Ok($"Added {CharaCard.ReadName(path) ?? Path.GetFileNameWithoutExtension(path)} to the scene.");
             }
             catch (Exception ex)

@@ -64,7 +64,8 @@ namespace HS2StudioBrowser
         public virtual bool HasControls => false;
 
         /// <summary>Draws the controls strip (GUILayout, inside the window), full width, between the list and the footer.</summary>
-        public virtual void DrawControls() { }
+        /// <param name="width">The strip's width, so its rows can wrap when the window is narrow.</param>
+        public virtual void DrawControls(float width) { }
 
         /// <summary>A short note shown on the item's row (rich text), e.g. its length; null for none. Called while drawing.</summary>
         public virtual string Badge(CatalogItem item) => null;

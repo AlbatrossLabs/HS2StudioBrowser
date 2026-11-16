@@ -71,8 +71,27 @@ namespace HS2StudioBrowser
             "# so tagging an outfit, a character and a scene with the same Project lets you filter all of them for it.\n" +
             "# Same format as the other lists:   Name: value, value     (one) after the name for one value at a time.\n\n" +
             "Project: FLOOP, Project B, Project C\n" +
-            "Status (one): Idea, WIP, Ready, Published, Archive\n" +
+            "Rating (one): Love, Like, Okay, Dislike\n" +
             "Use: Favorite, Thumbnail, Marketing, Reference\n";
+
+        /// <summary>
+        /// 0.17.1: the shared Status group became Rating (most cards come from other people, so the useful
+        /// question is whether you like one). Swaps the line in an existing shared list if it's still the old one.
+        /// </summary>
+        public static void MigrateShared(string file)
+        {
+            try
+            {
+                if (!System.IO.File.Exists(file)) return;
+                var text = System.IO.File.ReadAllText(file, System.Text.Encoding.UTF8);
+                var updated = text.Replace("Status (one): Idea, WIP, Ready, Published, Archive", "Rating (one): Love, Like, Okay, Dislike");
+                if (updated != text) System.IO.File.WriteAllText(file, updated, new System.Text.UTF8Encoding(false));
+            }
+            catch (System.Exception ex)
+            {
+                Log.Source.LogWarning("Couldn't update the shared tag list: " + ex.Message);
+            }
+        }
 
         public const string Outfits = Header +
             "# Automatic groups (in the filter wheel, worked out from each card): Parts (which clothing slots are used), Accessories (how many).\n" +

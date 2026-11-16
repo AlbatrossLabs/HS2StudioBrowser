@@ -38,7 +38,12 @@ namespace HS2StudioBrowser.Animations
 
         private static OCIChar[] Characters() => AnimePanel.Targets().ToArray();
 
-        public void Draw(AnimationBrowserPlugin plugin)
+        private readonly Flow _sliders = new Flow(), _options = new Flow(), _buttons = new Flow();
+
+        /// <summary>A slider row's narrowest useful width: label, 90 px of track, value.</summary>
+        private static float SliderW => Flow.Fixed(52, Theme.Skin.label) + 90 + Flow.Fixed(34, Theme.Skin.label);
+
+        public void Draw(AnimationBrowserPlugin plugin, float width)
         {
             if (_label == null)
             {
@@ -73,18 +78,26 @@ namespace HS2StudioBrowser.Animations
                 GUI.enabled = was && first != null;
                 var h = first != null && first.isHAnime;
 
-                GUILayout.BeginHorizontal();
+                // Two sliders a row while there's room; one a row when the window is narrow.
+                var inner = width - 12;
+                _sliders.Begin(inner);
+                _sliders.Next(SliderW + Flow.Fixed(30) + 12);
                 Slider("Speed", Drag.Speed, first != null ? first.animeSpeed : 1f, 0f, 3f, true);
                 if (GUILayout.Button(new GUIContent("1×", "Normal speed"), GUILayout.Width(30))) SetNow(Drag.Speed, 1f);
                 GUILayout.Space(12);
+                _sliders.Next(SliderW + Flow.Fixed(30) + 12);
                 Slider("Pattern", Drag.Pattern, first != null ? first.animePattern : 0.5f, 0f, 1f, true);
-                GUILayout.EndHorizontal();
+                GUILayout.Space(Flow.Fixed(30) + 12);
+                _sliders.End();
 
-                GUILayout.BeginHorizontal();
+                _options.Begin(inner);
+                _options.Next(SliderW + Flow.Fixed(30) + 12);
                 Slider("Option 1", Drag.Option0, h ? first.animeOptionParam[0] : 0.5f, 0f, 1f, h);
-                GUILayout.Space(46);
+                GUILayout.Space(Flow.Fixed(30) + 12);
+                _options.Next(SliderW + Flow.Fixed(30) + 12);
                 Slider("Option 2", Drag.Option1, h ? first.animeOptionParam[1] : 0.5f, 0f, 1f, h);
-                GUILayout.EndHorizontal();
+                GUILayout.Space(Flow.Fixed(30) + 12);
+                _options.End();
 
                 // Timeline: where the animation is now; drag to jump there (at speed 0 it stays on that frame).
                 GUILayout.BeginHorizontal();
@@ -95,7 +108,8 @@ namespace HS2StudioBrowser.Animations
                 GUILayout.Label(first != null ? TimeText(first) : "-", _value, GUILayout.Width(120));
                 GUILayout.EndHorizontal();
 
-                GUILayout.BeginHorizontal();
+                _buttons.Begin(inner);
+                _buttons.Next(Flow.Size(" Props", Theme.Skin.toggle) + 10 + Flow.Size(" Loop", Theme.Skin.toggle));
                 var props = first != null && first.optionItemCtrl != null && first.optionItemCtrl.visible;
                 var np = GUILayout.Toggle(props, new GUIContent(" Props", "Show the animation's own items (a chair, a toy...)"), GUILayout.ExpandWidth(false));
                 if (first != null && np != props) foreach (var c in chars) if (c.optionItemCtrl != null) c.optionItemCtrl.visible = np;
@@ -103,11 +117,13 @@ namespace HS2StudioBrowser.Animations
                 var loop = first != null && first.charAnimeCtrl.isForceLoop;
                 var nl = GUILayout.Toggle(loop, new GUIContent(" Loop", "Loop animations that would otherwise play once and stop"), GUILayout.ExpandWidth(false));
                 if (first != null && nl != loop) foreach (var c in chars) c.charAnimeCtrl.isForceLoop = nl;
-                GUILayout.FlexibleSpace();
+                _buttons.Spring();
+                _buttons.Next(Flow.Fixed(64) + Flow.Fixed(76) + 8, true);
                 if (GUILayout.Button(new GUIContent("Restart", "Start the selected characters' (and items') animations over"), GUILayout.Width(64))) Restart(SelectedAnimated());
                 if (GUILayout.Button(new GUIContent("Restart all", "Start every animation in the scene over, in step"), GUILayout.Width(76)))
                     Restart(Studio.Studio.Instance.dicObjectCtrl.Values.Where(v => v.kind == 0 || v.kind == 1).ToArray());
                 GUILayout.Space(8);
+                _buttons.Next(Flow.Fixed(48) + Flow.Fixed(48), true);
                 if (GUILayout.Button(new GUIContent("Copy", "Remember this character's animation"), GUILayout.Width(48)) && first != null)
                 {
                     _copied = new OICharInfo.AnimeInfo();
@@ -117,7 +133,7 @@ namespace HS2StudioBrowser.Animations
                 if (GUILayout.Button(new GUIContent("Paste", "Play the copied animation on the selected characters"), GUILayout.Width(48)))
                     using (AnimationTable.Unfiltered())
                         foreach (var c in chars) c.LoadAnime(_copied.group, _copied.category, _copied.no);
-                GUILayout.EndHorizontal();
+                _buttons.End();
                 GUI.enabled = was;
                 RefreshStudioBox();
             }

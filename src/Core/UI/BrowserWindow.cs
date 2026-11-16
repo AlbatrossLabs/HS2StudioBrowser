@@ -316,6 +316,8 @@ namespace HS2StudioBrowser.UI
             var replaced = _kind.TakeReplaced();
             if (replaced != null)
             {
+                var before = View();
+                _reselectAt = replaced.Select(kv => before.FindIndex(x => FileOps.Same(x.Path, kv.Key))).Where(i => i >= 0).DefaultIfEmpty(-1).Min();
                 foreach (var kv in replaced)
                 {
                     _thumbs.Invalidate(kv.Key);
@@ -379,6 +381,7 @@ namespace HS2StudioBrowser.UI
         }
 
         private bool _scannedWithSubfolders;
+        private int _reselectAt = -1;
 
         /// <summary>
         /// Subfolders are shown when ticked, and also for a folder whose cards are all in its subfolders
@@ -386,7 +389,7 @@ namespace HS2StudioBrowser.UI
         /// </summary>
         private bool IncludeSubfoldersNow()
         {
-            if (_p.IncludeSubfolders.Value || _filter.Count > 0 || _dupeMode) return true;
+            if (_p.IncludeSubfolders.Value || _filter.Count > 0 || _dupeMode || _kind.ForceSubfolders) return true;
             var node = _index.Find(_folder);
             return node != null && node.FileCount == 0 && node.TotalCount > 0;
         }
@@ -398,6 +401,18 @@ namespace HS2StudioBrowser.UI
             foreach (var e in _index.Entries) _modified[e.Path] = e.Modified;
             _selected.RemoveWhere(p => !_modified.ContainsKey(p));
             if (_anchor != null && !_modified.ContainsKey(_anchor)) _anchor = null;
+            // A card replaced by the kind left this view (a pose that got its picture, in "No picture"):
+            // select the one that took its place, so the next one is ready to go.
+            if (_reselectAt >= 0)
+            {
+                var at = _reselectAt;
+                _reselectAt = -1;
+                if (_selected.Count == 0)
+                {
+                    var v = View();
+                    if (v.Count > 0) SelectOnly(v[Mathf.Min(at, v.Count - 1)].Path);
+                }
+            }
             if (_index.Find(_folder) == null && _index.Tree != null)
             {
                 _folder = _index.Tree.Path;
@@ -675,6 +690,8 @@ namespace HS2StudioBrowser.UI
             DrawTree();
             GUILayout.Space(6);
             DrawGrid();
+            GUILayout.Space(6);
+            DrawDetails();
             GUILayout.EndHorizontal();
             GUILayout.Space(4);
             DrawFooter();
@@ -688,6 +705,36 @@ namespace HS2StudioBrowser.UI
 
             GUI.DragWindow(new Rect(0, 0, _rect.width - 34, 28));
             IMGUIUtils.EatInputInRect(_rect);
+        }
+
+        // ---------------------------------------------------------------- details panel (right)
+
+        private void DrawDetails()
+        {
+            var w = TagPanel.WidthFor(_rect.width);
+            var tree = _p.ShowFolders.Value ? TreeWidth : 24;
+            if (!_p.ShowDetails.Value || _rect.width - 20 - tree - w - 12 < 240)
+            {
+                TagPanel.DrawFolded(() => _p.ShowDetails.Value = true);
+                return;
+            }
+            var sel = new TagPanel.Selection { Noun = N };
+            var p = Primary();
+            if (p != null && _selected.Count > 0)
+            {
+                var paths = SelectedInOrder();
+                if (paths.Count == 0) paths = new List<string> { p.Path };
+                var showFile = !string.IsNullOrEmpty(p.Name) && !string.Equals(p.Name, p.FileName, StringComparison.OrdinalIgnoreCase);
+                var root = _kind.Root(_sex);
+                var rel = p.Folder != null && root != null && p.Folder.StartsWith(root, StringComparison.OrdinalIgnoreCase) ? p.Folder.Substring(root.Length).TrimStart('\\', '/') : null;
+                sel.Targets = paths;
+                sel.Title = paths.Count > 1 ? $"{paths.Count} {Ns} selected" : string.IsNullOrEmpty(p.Name) ? p.FileName : p.Name;
+                sel.Subtitle = Theme.Hint(paths.Count > 1 ? $"tags you click go on all {paths.Count}; showing {(string.IsNullOrEmpty(p.Name) ? p.FileName : p.Name)}"
+                    : (showFile ? Path.GetFileName(p.Path) : Path.GetExtension(p.Path).TrimStart('.')) + (string.IsNullOrEmpty(rel) ? "" : "\n" + rel));
+                sel.Picture = _kind.HasPicture(p.Path) ? _thumbs.Get(p.Path, p.Modified) : null;
+                sel.Auto = paths.Count == 1 && _auto != null ? _auto.Get(p.Path, p.Modified) : null;
+            }
+            _details.Draw(w, _tagSet, _tags, sel, TagsChanged, () => _p.ShowDetails.Value = false);
         }
 
         // ---------------------------------------------------------------- tags
@@ -716,19 +763,26 @@ namespace HS2StudioBrowser.UI
         {
             if (_filter.Count == 0) return;
             GUILayout.Space(3);
-            GUILayout.BeginHorizontal();
+            var f = _filterFlow;
+            f.Begin(BarWidth);
+            f.Next(Flow.Size(Theme.Hint("Tagged"), Theme.RichSingle));
             GUILayout.Label(Theme.Hint("Tagged"), Theme.RichSingle, GUILayout.ExpandWidth(false));
             foreach (var tag in _filter.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList())
             {
                 var t = tag;
-                if (GUILayout.Button(new GUIContent(t.Replace(":", ": ") + "  x", "Remove this from the filter"), Theme.Choice, GUILayout.ExpandWidth(false)))
+                var chip = new GUIContent(t.Replace(":", ": ") + "  x", "Remove this from the filter");
+                f.Next(Flow.Size(chip, Theme.Choice));
+                if (GUILayout.Button(chip, Theme.Choice, GUILayout.ExpandWidth(false)))
                     Later(() => { _filter.Remove(t); TagsChanged(); });
             }
+            f.Next(Flow.Fixed(50));
             if (GUILayout.Button(new GUIContent("Clear", "Show everything again"), GUILayout.Width(50)))
                 Later(() => { _filter.Clear(); TagsChanged(); });
             var reading = _auto != null && _auto.Pending > 0 ? $"  ·  reading {_auto.Pending} cards for automatic tags" : "";
-            GUILayout.Label(Theme.Hint("in this folder and its subfolders" + reading), Theme.RichSingle, GUILayout.ExpandWidth(true));
-            GUILayout.EndHorizontal();
+            var hint = Theme.Hint("in this folder and its subfolders" + reading);
+            f.Next(Mathf.Min(Flow.Size(hint, Theme.RichSingle), BarWidth));
+            GUILayout.Label(hint, Theme.RichSingle, GUILayout.ExpandWidth(true));
+            f.End();
         }
 
         /// <summary>"Black · Swimwear · Suggestive" for the footer.</summary>
@@ -745,23 +799,33 @@ namespace HS2StudioBrowser.UI
 
         // ---------------------------------------------------------------- top bar
 
+        // Bars that wrap onto more rows when the window is narrow.
+        private readonly Flow _topFlow = new Flow(), _filterFlow = new Flow(), _footFlow = new Flow();
+        private readonly TagPanel _details = new TagPanel();
+        private float BarWidth => _rect.width - 20;
+
         private void DrawTopBar()
         {
-            GUILayout.BeginHorizontal();
+            var f = _topFlow;
+            var skin = Theme.Skin;
+            f.Begin(BarWidth);
 
             if (_kind.HasSex)
             {
+                f.Next(Flow.Fixed(66, Theme.Choice) + Flow.Fixed(54, Theme.Choice) + 10);
                 if (GUILayout.Toggle(_sex == 1, "Female", Theme.Choice, GUILayout.Width(66)) && _sex != 1) Later(() => { SetSex(1, true); Rescan(); });
                 if (GUILayout.Toggle(_sex == 0, "Male", Theme.Choice, GUILayout.Width(54)) && _sex != 0) Later(() => { SetSex(0, true); Rescan(); });
                 GUILayout.Space(10);
             }
+            f.Next(Flow.Size("Search", Styles.Small) + Flow.Fixed(150, skin.textField) + (_search?.Length > 0 ? Flow.Fixed(22) : 0));
             GUILayout.Label("Search", Styles.Small, GUILayout.ExpandWidth(false));
             GUI.SetNextControlName("ob_search");
             _search = GUILayout.TextField(_search ?? "", GUILayout.Width(150));
             if (_search.Length > 0 && GUILayout.Button("x", GUILayout.Width(22))) _search = "";
 
-            GUILayout.FlexibleSpace();
+            f.Spring();
 
+            f.Next(Flow.Size("Sort", Styles.Small) + Flow.Fixed(50, Theme.Choice) + Flow.Fixed(40, Theme.Choice) + Flow.Fixed(58, Theme.Choice) + Flow.Fixed(52, Theme.Choice) + 8, true);
             GUILayout.Label("Sort", Styles.Small, GUILayout.ExpandWidth(false));
             SortChoice(SortBy.Name, "Name", 50);
             SortChoice(SortBy.FileName, "File", 40);
@@ -769,6 +833,7 @@ namespace HS2StudioBrowser.UI
             SortChoice(SortBy.Oldest, "Oldest", 52);
 
             GUILayout.Space(8);
+            f.Next(Flow.Size("Subfolders", skin.toggle), true);
             var sub = GUILayout.Toggle(_p.IncludeSubfolders.Value, "Subfolders", GUILayout.ExpandWidth(false));
             if (sub != _p.IncludeSubfolders.Value)
             {
@@ -776,9 +841,11 @@ namespace HS2StudioBrowser.UI
                 Later(Rescan);
             }
 
+            if (_kind.TopBarExtrasWidth > 0) f.Next(_kind.TopBarExtrasWidth, true);
             if (_kind.DrawTopBarExtras()) Later(Rescan);
 
             GUILayout.Space(6);
+            f.Next(6 + Flow.Fixed(_filter.Count > 0 ? 68 : 48), true);
             var tagLabel = _filter.Count > 0 ? $"Tags ({_filter.Count})" : "Tags";
             if (GUILayout.Button(new GUIContent(tagLabel, $"Show only {Ns} with certain tags (opens the tag wheel)"), _filter.Count > 0 ? Theme.Primary : Theme.Skin.button, GUILayout.Width(_filter.Count > 0 ? 68 : 48)))
             {
@@ -788,6 +855,7 @@ namespace HS2StudioBrowser.UI
 
             GUILayout.Space(4);
             var dupeLabel = !_dupeMode ? "Duplicates" : _dupes.Busy ? "Checking..." : $"Duplicates ({_dupes.SetCount})";
+            f.Next(4 + Flow.Size("Duplicates (999)", skin.toggle), true);
             var dupe = GUILayout.Toggle(_dupeMode, new GUIContent(dupeLabel, $"Show only {Ns} that have a copy in this folder or its subfolders{(_kind.NearTolerance > 0 ? " (or a near-identical one)" : "")}"), GUILayout.ExpandWidth(false));
             if (dupe != _dupeMode) Later(() => SetDuplicateMode(dupe));
 
@@ -795,6 +863,7 @@ namespace HS2StudioBrowser.UI
             {
                 GUILayout.Space(6);
                 var label = _mods.Pending > 0 ? "Missing mods..." : _missingCount > 0 ? $"Missing mods ({_missingCount})" : "Missing mods";
+                f.Next(6 + Flow.Size("Missing mods (999)", skin.toggle), true);
                 var only = GUILayout.Toggle(_onlyMissing, new GUIContent(label, $"Show only {Ns} that use zipmods you don't have"), GUILayout.ExpandWidth(false));
                 if (only != _onlyMissing)
                 {
@@ -804,6 +873,7 @@ namespace HS2StudioBrowser.UI
                 }
             }
 
+            f.Next(8 + Flow.Fixed(80, skin.horizontalSlider) + 6 + Flow.Fixed(64), true);
             GUILayout.Space(8);
             var w = GUILayout.HorizontalSlider(_p.ThumbnailWidth.Value, 60, _kind.MaxThumbWidth, GUILayout.Width(80));
             var wi = Mathf.RoundToInt(w / 5f) * 5;
@@ -817,7 +887,7 @@ namespace HS2StudioBrowser.UI
                     Rescan();
                 });
 
-            GUILayout.EndHorizontal();
+            f.End();
         }
 
         private void SortChoice(SortBy value, string label, float width)
@@ -1265,17 +1335,24 @@ namespace HS2StudioBrowser.UI
         private void DrawFooter()
         {
             var view = View();
-            GUILayout.BeginHorizontal();
+            var f = _footFlow;
+            f.Begin(BarWidth);
 
             var info = $"{view.Count} {(view.Count == 1 ? N : Ns)}";
             if (_favCount > 0) info += $"  ·  {_favCount} favorite{(_favCount == 1 ? "" : "s")}";
             if (_mods != null && _missingCount > 0 && !_onlyMissing) info += $"  ·  {_missingCount} missing mods";
             if (_selected.Count > 0) info += $"  ·  {_selected.Count} selected";
+            f.Next(Flow.Size(info, Styles.Small) + 10);
             GUILayout.Label(info, Styles.Small, GUILayout.ExpandWidth(false));
             GUILayout.Space(10);
 
-            GUILayout.Label(_kind.TargetLine(_sex), Theme.RichSingle, GUILayout.ExpandWidth(true));
+            var target = _kind.TargetLine(_sex);
+            f.Next(Mathf.Min(Flow.Size(target, Theme.RichSingle), BarWidth));
+            GUILayout.Label(target, Theme.RichSingle, GUILayout.ExpandWidth(true));
+            if (_kind.FooterExtrasWidth > 0) f.Next(_kind.FooterExtrasWidth, true);
             _kind.DrawFooterExtras();
+
+            f.Next(_kind.Actions.Sum(a => Flow.Fixed(a.Width)), true);
 
             // The kind's actions, primary last (rightmost), as in a dialog.
             var was = GUI.enabled;
@@ -1288,7 +1365,7 @@ namespace HS2StudioBrowser.UI
             }
             GUI.enabled = was;
 
-            GUILayout.EndHorizontal();
+            f.End();
 
             var line = "";
             if (_status != null && Time.unscaledTime < _statusUntil) line = _statusError ? Theme.Error(_status) : _status;

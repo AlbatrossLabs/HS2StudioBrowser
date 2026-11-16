@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using BepInEx;
 using BepInEx.Configuration;
@@ -44,6 +45,8 @@ namespace HS2StudioBrowser
         public ConfigEntry<int> CacheSize;
         public ConfigEntry<bool> CheckMods;
         public ConfigEntry<bool> ShowFolders;
+        public ConfigEntry<bool> ShowDetails;
+        public ConfigEntry<bool> StayOpenAfterAdd;
         public ConfigEntry<string> OpenFolders;
         public ConfigEntry<string> WindowRect;
         public ConfigEntry<string> LastFolderFemale;
@@ -97,15 +100,36 @@ namespace HS2StudioBrowser
         public static string SharedTagSetFile => Path.Combine(Paths.ConfigPath, "HS2StudioBrowser.shared.tagset.txt");
 
         /// <summary>The kind's tag list, with the shared groups added.</summary>
-        internal Files.TagSet CreateTagSet() =>
-            new Files.TagSet(TagSetFile, Kind.DefaultTagSet, Kind.OlderTagSets,
+        internal Files.TagSet CreateTagSet()
+        {
+            if (Kind.UsesSharedTags) TagSets.MigrateShared(SharedTagSetFile);
+            return new Files.TagSet(TagSetFile, Kind.DefaultTagSet, Kind.OlderTagSets,
                 Kind.UsesSharedTags ? new Files.TagSet(SharedTagSetFile, TagSets.Shared) : null);
+        }
 
         /// <summary>Your names for catalog items, and items marked for deletion.</summary>
         public string NamesFile => Path.Combine(Paths.ConfigPath, $"HS2StudioBrowser.{Kind.Id}.names.txt");
         public string MarkedFile => Path.Combine(Paths.ConfigPath, $"HS2StudioBrowser.{Kind.Id}.marked.txt");
 
         public string FavoritesFile => Path.Combine(Paths.ConfigPath, $"HS2StudioBrowser.{Kind.Id}.favorites.txt");
+
+        /// <summary>Takes the value saved under a setting's old name (now an orphan in the .cfg) and drops the old line.</summary>
+        private void CarryOver<T>(ConfigEntry<T> entry, string section, string oldKey)
+        {
+            try
+            {
+                var orphans = HarmonyLib.AccessTools.Property(typeof(ConfigFile), "OrphanedEntries")?.GetValue(Config, null) as IDictionary<ConfigDefinition, string>;
+                var def = new ConfigDefinition(section, oldKey);
+                if (orphans == null || !orphans.TryGetValue(def, out var value)) return;
+                entry.SetSerializedValue(value);
+                orphans.Remove(def);
+                Config.Save();
+            }
+            catch (Exception ex)
+            {
+                Log.Source.LogDebug($"Couldn't carry over \"{oldKey}\": {ex.Message}");
+            }
+        }
 
         protected virtual void Awake()
         {
@@ -121,6 +145,20 @@ namespace HS2StudioBrowser
                 $"Opening the {k.StudioListName} shows only the {k.Title}: Studio's own list (and Browser Folders' window for it) stays hidden, and closing the browser closes the list. " +
                 $"Turn off to see both side by side. While Camera Sweep is picking {k.Nouns}, Studio's list is shown as normal.");
             WindowRect = Config.Bind("Window", "Position", "", new ConfigDescription("Saved window position and size.", null, "Advanced"));
+            if (k.AddsToScene)
+            {
+                StayOpenAfterAdd = Config.Bind("General", "Stay open after adding", true,
+                    $"Adding a {k.Noun} from the browser keeps Studio's Add menu (and so the browser) open, even with Studio's option to close the menu after adding on. " +
+                    "Off: Studio's option decides, as in its own list. Adding from Studio's own lists is never changed.");
+                k.KeepAddMenuOpen = () => StayOpenAfterAdd.Value;
+            }
+            ShowDetails = Config.Bind("View", "Show details panel", true,
+                $"Show the selected {k.Noun}'s picture, name and tags on the right, where tags can be set by clicking them (the chevron at its top folds it away). It folds itself away when the window is too narrow for it.");
+            foreach (var old in k.OldStudioListNames)
+            {
+                CarryOver(OpenWithStudioList, "General", $"Open with the {old}");
+                CarryOver(ReplaceStudioList, "General", $"Replace the {old}");
+            }
 
             if (k is BrowserKind bk)
             {
@@ -225,6 +263,7 @@ namespace HS2StudioBrowser
                 _autoOpened = false;
             }
 
+            AddMenuHold.Tick();
             var open = Kind.StudioListOpen(out var listSex);
             var picking = CameraSweepBridge.Picking();
             var replace = ReplaceStudioList.Value && !picking;

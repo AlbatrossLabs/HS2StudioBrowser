@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
+using HS2StudioBrowser.Game;
 using Studio;
 using UnityEngine;
 
@@ -120,10 +121,10 @@ namespace HS2StudioBrowser.Items
         }
 
         /// <summary>Adds the item as Studio's list does (at the start position, selected if Studio's options say so).</summary>
-        public static bool Add(int group, int category, int no)
+        public static bool Add(int group, int category, int no, bool keepMenuOpen)
         {
             var before = Studio.Studio.Instance.dicObjectCtrl.Count;
-            Studio.Studio.Instance.AddItem(group, category, no);
+            AddMenuHold.Run(keepMenuOpen, () => { Studio.Studio.Instance.AddItem(group, category, no); return 0; });
             return Studio.Studio.Instance.dicObjectCtrl.Count > before;
         }
 

@@ -1,3 +1,4 @@
+using System;
 using HarmonyLib;
 
 namespace HS2StudioBrowser
@@ -20,6 +21,14 @@ namespace HS2StudioBrowser
 
         /// <summary>Studio's own list this browser can stand in for: "Costume list".</summary>
         public abstract string StudioListName { get; }
+        /// <summary>Whether the kind adds things to the scene from Studio's Add menu (items, characters): offers "Stay open after adding".</summary>
+        public virtual bool AddsToScene => false;
+
+        /// <summary>Set by the plugin: whether adding should keep Studio's Add menu open (its "Stay open after adding").</summary>
+        public Func<bool> KeepAddMenuOpen = () => false;
+
+        /// <summary>Names the list had in earlier versions, so settings saved under them carry over.</summary>
+        public virtual string[] OldStudioListNames => new string[0];
 
         /// <summary>True while Studio's list for this kind is on screen, with the sex it shows (-1 if none).</summary>
         public abstract bool StudioListOpen(out int sex);

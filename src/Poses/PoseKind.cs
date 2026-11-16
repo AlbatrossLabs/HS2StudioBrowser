@@ -39,6 +39,10 @@ namespace HS2StudioBrowser.Poses
 
         private static readonly string[] PngOnly = { "*.png" };
         private static readonly string[] PngAndDat = { "*.png", "*.dat" };
+        private static readonly string[] DatOnly = { "*.dat" };
+
+        /// <summary>"No picture" in the top bar: only poses without a picture (.dat), from every subfolder.</summary>
+        private bool _onlyNoPicture;
 
         public PoseKind(PoseBrowserPlugin plugin)
         {
@@ -98,7 +102,8 @@ namespace HS2StudioBrowser.Poses
         public override int MaxThumbWidth => 360;
         public override bool ChecksMods => false;
 
-        public override string[] FilePatterns => _plugin.ShowDat.Value ? PngAndDat : PngOnly;
+        public override string[] FilePatterns => _onlyNoPicture ? DatOnly : _plugin.ShowDat.Value ? PngAndDat : PngOnly;
+        public override bool ForceSubfolders => _onlyNoPicture;
         public override bool HasPicture(string path) => !PoseFile.IsDat(path);
         public override string NoPictureText(string path) => ".dat  ·  no picture";
 
@@ -240,7 +245,7 @@ namespace HS2StudioBrowser.Poses
 
             try
             {
-                var png = Studio.Studio.Instance.gameScreenShot.CreatePngScreen(320, 180);
+                var png = Shot();
                 var newPath = PoseFile.WriteWithPicture(path, png);
                 if (!FileOps.Same(newPath, path))
                 {
@@ -323,15 +328,70 @@ namespace HS2StudioBrowser.Poses
 
         // ---------------------------------------------------------------- top bar
 
+        public override float TopBarExtrasWidth => 6 + Flow.Size(".dat", Theme.Skin.toggle) + Flow.Size("No picture", Theme.Skin.toggle) + Flow.Size("Try on", Theme.Skin.toggle);
+        public override float FooterExtrasWidth => Flow.Size(Theme.Hint("Save as"), Theme.RichSingle) + Flow.Fixed(120, Theme.Skin.textField) + Flow.Fixed(52) + 14;
+
+        /// <summary>
+        /// A picture of what Studio's camera sees, at the chosen size; with Smooth edges, shot at twice the
+        /// size and halved (each pixel the average of four), which cleans up jagged edges.
+        /// </summary>
+        private byte[] Shot()
+        {
+            PoseBrowserPlugin.Dimensions(_plugin.PictureSizeSetting.Value, out var w, out var h);
+            var scale = _plugin.SharperPictures.Value ? 2 : 1;
+            var png = Studio.Studio.Instance.gameScreenShot.CreatePngScreen(w * scale, h * scale, false, false);
+            if (scale == 1 || png == null) return png;
+
+            Texture2D big = null, small = null;
+            RenderTexture rt = null;
+            var was = RenderTexture.active;
+            try
+            {
+                big = new Texture2D(2, 2, TextureFormat.RGB24, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+                if (!big.LoadImage(png)) return png;
+                rt = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+                Graphics.Blit(big, rt);
+                RenderTexture.active = rt;
+                small = new Texture2D(w, h, TextureFormat.RGB24, false);
+                small.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+                small.Apply();
+                return small.EncodeToPNG();
+            }
+            catch (Exception ex)
+            {
+                Log.Source.LogWarning("Couldn't scale the picture down, saving it full size: " + ex.Message);
+                return png;
+            }
+            finally
+            {
+                RenderTexture.active = was;
+                if (rt != null) RenderTexture.ReleaseTemporary(rt);
+                if (big != null) UnityEngine.Object.Destroy(big);
+                if (small != null) UnityEngine.Object.Destroy(small);
+            }
+        }
+
         public override bool DrawTopBarExtras()
         {
             GUILayout.Space(6);
             var dat = GUILayout.Toggle(_plugin.ShowDat.Value, new GUIContent(".dat", "Also show .dat poses (Studio's own format, without a picture). Picture gives one a picture and makes it a .png."), GUILayout.ExpandWidth(false));
+            var only = GUILayout.Toggle(_onlyNoPicture, new GUIContent("No picture",
+                "Show only the poses without a picture (.dat), from this folder and every folder in it (the folder counts show how many each has). " +
+                "Select one, frame the camera and press Picture: it gets its picture, leaves this list, and the next one is selected. Arrow keys try each pose on."), GUILayout.ExpandWidth(false));
             var step = GUILayout.Toggle(_plugin.ApplyOnStep.Value, new GUIContent("Try on", "Arrow keys put each pose on the selected characters as you move to it; Backspace puts back the pose from before"), GUILayout.ExpandWidth(false));
             if (step != _plugin.ApplyOnStep.Value) _plugin.ApplyOnStep.Value = step;
-            if (dat == _plugin.ShowDat.Value) return false;
-            _plugin.ShowDat.Value = dat;
-            return true;
+            var rescan = false;
+            if (only != _onlyNoPicture)
+            {
+                _onlyNoPicture = only;
+                rescan = true;
+            }
+            if (dat != _plugin.ShowDat.Value)
+            {
+                _plugin.ShowDat.Value = dat;
+                rescan = true;
+            }
+            return rescan;
         }
 
         // ---------------------------------------------------------------- Studio's Pose list
