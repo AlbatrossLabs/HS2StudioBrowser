@@ -8,3 +8,6 @@ docs/gifs/AnimBrowser.gif
 docs/gifs/CharacterBrowser.gif
 docs/gifs/OutfitBrowser.gif
 docs/gifs/PoseBrowser.gif
+
+# Release zips built for GitHub Releases (uploaded there, not committed)
+Releases/

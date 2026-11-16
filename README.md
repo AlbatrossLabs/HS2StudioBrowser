@@ -57,6 +57,19 @@ Studio's items as a grid of pictures, reusing Quick Access Box's thumbnails and 
 
 <!-- ![Tags](docs/gifs/tags.gif) -->
 
+## Plugins it can replace
+
+Studio Browser covers what these plugins do in Studio. You can remove them, or keep them for the parts listed on the right; nothing conflicts if you keep them.
+
+| Plugin | Studio Browser covers | Still worth keeping for |
+|---|---|---|
+| **Animation Search** | Searching every animation (name, group, category or zipmod) | Nothing in Studio. If installed, the Animations browser reads its full list |
+| **Pose Quick Load** | Loading a pose with one click (plus arrow-key try-on and undo) | Nothing in Studio |
+| **Studio Character Sort** | Sorting characters by name, file, newest or oldest | Nothing in Studio |
+| **Quick Access Box** | Browsing and searching items, favorites, recently used, item pictures | Its pop-up search box. If installed, the Items browser reuses its thumbnails |
+| **Browser Folders** | Folders for outfits, characters and scenes in Studio | The character maker and the main game. Studio Browser keeps its scene save folder in step |
+| **Pose Preview** | Pose pictures (and a *No picture* list to make them) | Hover previews of animations, and its hand browser |
+
 ## Install
 
 1. Needs HS2 with BepInEx 5 and HS2API, which BetterRepack includes. The Poses browser also needs Pose Tools, which BetterRepack includes too.
