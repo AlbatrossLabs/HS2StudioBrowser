@@ -1,3 +1,4 @@
+using HS2StudioBrowser.Game;
 using System.Collections.Generic;
 using HS2StudioBrowser.Files;
 using HS2StudioBrowser.UI;
@@ -75,6 +76,16 @@ namespace HS2StudioBrowser.Items
             yield return "Source:" + (ids.Mod ? "Mod" : "Base game");
             yield return "Colors:" + (ids.Colors <= 0 ? "None" : ids.Colors.ToString());
         }
+        public override string[] OwnListPrefixes => new[] { "Item" };
+
+        public override void ShowNameInStudio(CatalogItem item, string name)
+        {
+            if (!(item.Tag is ItemTable.Ids ids)) return;
+            var t = Studio.Info.Instance.dicItemLoadInfo;
+            if (t.TryGetValue(ids.Group, out var cats) && cats.TryGetValue(ids.Category, out var items) && items.TryGetValue(ids.No, out var info))
+                StudioNames.Apply(item.Key, info, name);
+        }
+
         public override string Id => "items";
         public override string Title => "Item Browser";
         public override string Noun => "item";

@@ -1,3 +1,4 @@
+using HS2StudioBrowser.Game;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -62,9 +63,10 @@ namespace HS2StudioBrowser.Items
                         c.Items.Add(new CatalogItem
                         {
                             Key = key,
-                            Name = ikv.Value?.name ?? $"#{ikv.Key}",
+                            Name = StudioNames.Original(key, ikv.Value?.name) ?? $"#{ikv.Key}",
                             Source = source,
-                            Tag = new Ids { Group = gkv.Key, Category = ckv.Key, No = ikv.Key, Mod = isMod, Colors = colors, Guid = guid, Slot = slot, Name = ikv.Value?.name ?? "" },
+                            ModGuid = guid,
+                            Tag = new Ids { Group = gkv.Key, Category = ckv.Key, No = ikv.Key, Mod = isMod, Colors = colors, Guid = guid, Slot = slot, Name = StudioNames.Original(key, ikv.Value?.name) ?? "" },
                             Order = order++,
                         });
                     }

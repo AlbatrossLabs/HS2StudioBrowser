@@ -15,7 +15,7 @@ namespace HS2StudioBrowser.Characters
     {
         public const string Guid = "com.albatrosslabs.hs2.studiobrowser.characters";
         public const string PluginName = "Studio Browser: Characters";
-        public const string Version = "0.15.0";
+        public const string Version = "0.16.0";
 
         protected override StudioListKind CreateKind() => new CharacterKind();
         protected override Texture2D CreateIcon() => CharacterIcon.Create();

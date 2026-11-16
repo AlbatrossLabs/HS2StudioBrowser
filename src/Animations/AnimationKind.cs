@@ -47,6 +47,16 @@ namespace HS2StudioBrowser.Animations
 
         public override string DefaultTagSet => TagSets.Animations;
         public override string[] OlderTagSets => new[] { TagSets.AnimationsV1, TagSets.AnimationsV2 };
+        public override string[] OwnListPrefixes => new[] { "Anime" };
+
+        public override void ShowNameInStudio(CatalogItem item, string name)
+        {
+            if (!(item.Tag is AnimationTable.Ids ids)) return;
+            var t = AnimationTable.Full();
+            if (t.TryGetValue(ids.Group, out var cats) && cats.TryGetValue(ids.Category, out var anims) && anims.TryGetValue(ids.No, out var info))
+                StudioNames.Apply(item.Key, info, name);
+        }
+
         public override string Id => "animations";
         public override string Title => "Animation Browser";
         public override string Noun => "animation";

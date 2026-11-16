@@ -53,6 +53,8 @@ namespace HS2StudioBrowser
         public ConfigEntry<ItemSort> ItemSortBy;
         public ConfigEntry<bool> PlayOnClick;
         public ConfigEntry<bool> GridView;
+        public ConfigEntry<bool> NamesInStudio;
+        public ConfigEntry<bool> HideMarked;
         public ConfigEntry<int> ItemThumbSize;
 
         public StudioListKind Kind { get; private set; }
@@ -98,6 +100,10 @@ namespace HS2StudioBrowser
         internal Files.TagSet CreateTagSet() =>
             new Files.TagSet(TagSetFile, Kind.DefaultTagSet, Kind.OlderTagSets,
                 Kind.UsesSharedTags ? new Files.TagSet(SharedTagSetFile, TagSets.Shared) : null);
+
+        /// <summary>Your names for catalog items, and items marked for deletion.</summary>
+        public string NamesFile => Path.Combine(Paths.ConfigPath, $"HS2StudioBrowser.{Kind.Id}.names.txt");
+        public string MarkedFile => Path.Combine(Paths.ConfigPath, $"HS2StudioBrowser.{Kind.Id}.marked.txt");
 
         public string FavoritesFile => Path.Combine(Paths.ConfigPath, $"HS2StudioBrowser.{Kind.Id}.favorites.txt");
 
@@ -152,6 +158,10 @@ namespace HS2StudioBrowser
                 ItemSortBy = Config.Bind("View", "Sort by", ItemSort.StudioOrder, $"Order of the {k.Nouns}: as Studio lists them, or by name. Favorites always come first.");
                 ShowFolders = Config.Bind("View", "Show group panel", true, "Show the groups and categories on the left (the chevron at its top folds it away).");
                 OpenFolders = Config.Bind("Window", "Open groups", "", new ConfigDescription("Groups expanded in the panel.", null, "Advanced"));
+                NamesInStudio = Config.Bind("General", "Use my names in Studio", true,
+                    $"Names you give {k.Nouns} here (F2) also show in Studio's own lists while the game runs. The zipmods are never edited; off shows the original names there.");
+                HideMarked = Config.Bind("View", "Hide marked for deletion", true,
+                    $"{k.Nouns.Substring(0, 1).ToUpper() + k.Nouns.Substring(1)} marked for deletion (Del) only show under *Marked for deletion*. Off: they show everywhere, marked in red.");
                 if (ik.HasPictures)
                 {
                     GridView = Config.Bind("View", "Show as grid", true, $"Show the {k.Nouns} as a grid of pictures (off: a list of names).");

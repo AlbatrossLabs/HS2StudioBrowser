@@ -51,6 +51,15 @@ namespace HS2StudioBrowser
         /// <summary>The window was closed (free pictures).</summary>
         public virtual void OnHidden() { }
 
+        /// <summary>
+        /// Shows <paramref name="name"/> for the item in Studio's own lists (null: its original name again).
+        /// Only the running game's copy changes; the zipmod is never edited.
+        /// </summary>
+        public virtual void ShowNameInStudio(CatalogItem item, string name) { }
+
+        /// <summary>Studio list files that belong to this kind ("ItemList", "ItemGroup"...): a zipmod holding only these can go when all its items are marked.</summary>
+        public virtual string[] OwnListPrefixes => new string[0];
+
         /// <summary>Whether the kind draws a controls strip under the list (animation speed, pattern...).</summary>
         public virtual bool HasControls => false;
 
@@ -92,6 +101,8 @@ namespace HS2StudioBrowser
         public string Name;
         /// <summary>Where it comes from, shown muted: a zipmod's name, "base game".</summary>
         public string Source;
+        /// <summary>The zipmod's GUID (null for the base game), for the deletion report.</summary>
+        public string ModGuid;
         public ItemCategory Category;
         /// <summary>The kind's own data (ids to load it with).</summary>
         public object Tag;

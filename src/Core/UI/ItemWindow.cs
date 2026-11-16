@@ -20,7 +20,7 @@ namespace HS2StudioBrowser.UI
         private const float TreeWidth = 230f;
         private const float StarSize = 16f;
 
-        private enum Scope { Favorites, Recent, Group, Category }
+        private enum Scope { Favorites, Recent, Marked, Group, Category }
 
         private readonly StudioBrowserPlugin _p;
         private readonly ItemKind _kind;
@@ -31,6 +31,16 @@ namespace HS2StudioBrowser.UI
         private readonly TagSet _tagSet;
         private readonly TagRadial _radial;
         private readonly HashSet<string> _filter = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly NameStore _names;
+        private readonly KeyList _marked;
+
+        // Rename box and deletion report (small windows over the browser).
+        private string _renameKey, _renameText;
+        private bool _renameFocus;
+        private bool _reportOpen;
+        private Vector2 _reportScroll;
+        private List<ReportRow> _report;
+        private int DialogId => WindowId + 5;
         private readonly HashSet<string> _expanded = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<Action> _pending = new List<Action>();
 
@@ -77,6 +87,8 @@ namespace HS2StudioBrowser.UI
             _tags = new TagStore(null, plugin.TagsFile);
             _tagSet = plugin.CreateTagSet();
             _radial = new TagRadial(WindowId + 3);
+            _names = new NameStore(plugin.NamesFile);
+            _marked = new KeyList(plugin.MarkedFile);
             foreach (var k in (_p.OpenFolders.Value ?? "").Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)) _expanded.Add(k);
         }
 
@@ -111,6 +123,8 @@ namespace HS2StudioBrowser.UI
             _visible = false;
             InputGuard.Set(this, false);
             _radial.Close();
+            _renameKey = null;
+            _reportOpen = false;
             _kind.OnHidden();
             SaveRect();
         }
@@ -152,9 +166,12 @@ namespace HS2StudioBrowser.UI
             foreach (var g in catalog) _groups[g.Key] = g;
             _catalog = catalog;
             _viewKey = null;
+            if (_p.NamesInStudio.Value)
+                foreach (var kv in _names.All)
+                    if (_byKey.TryGetValue(kv.Key, out var named)) TryShowName(named, kv.Value);
 
             // Keep the open scope if it still exists, else start on Favorites (or the first category).
-            var valid = _scope == Scope.Favorites || _scope == Scope.Recent
+            var valid = _scope == Scope.Favorites || _scope == Scope.Recent || _scope == Scope.Marked
                 || (_scope == Scope.Group && _scopeKey != null && _groups.ContainsKey(_scopeKey))
                 || (_scope == Scope.Category && _scopeKey != null && _categories.ContainsKey(_scopeKey));
             if (!valid)
@@ -249,7 +266,7 @@ namespace HS2StudioBrowser.UI
         {
             // Recently used keeps its order while it's on screen (so stepping through it doesn't reshuffle it); it catches up when reopened.
             var recentVersion = _scope == Scope.Recent && !Searching ? 0 : _recent.Version;
-            var key = $"{_scope}|{_scopeKey}|{_search}|{_p.ItemSortBy.Value}|{_favs.Version}|{recentVersion}|{_catalog?.Count}|{_tags.Version}|{string.Join("|", _filter.ToArray())}|{(_filter.Count > 0 || Searching ? _kind.AutoVersion : 0)}";
+            var key = $"{_scope}|{_scopeKey}|{_search}|{_p.ItemSortBy.Value}|{_favs.Version}|{recentVersion}|{_catalog?.Count}|{_tags.Version}|{string.Join("|", _filter.ToArray())}|{(_filter.Count > 0 || Searching ? _kind.AutoVersion : 0)}|{_names.Version}|{_marked.Version}|{_p.HideMarked.Value}";
             if (key == _viewKey) return _view;
             _viewKey = key;
 
@@ -266,7 +283,7 @@ namespace HS2StudioBrowser.UI
                         var tags = AllTags(i);
                         if (!TagFilter.Matches(tags, _filter)) return false;
                         if (words.Length == 0) return true;
-                        var hay = (i.Name + " " + i.Source + " " + i.Category.Name + " " + i.Category.Group.Name + " " + string.Join(" ", tags.Select(TagFilter.ValueOf).ToArray())).ToLowerInvariant();
+                        var hay = (i.Name + " " + _names.Get(i.Key) + " " + i.Source + " " + i.Category.Name + " " + i.Category.Group.Name + " " + string.Join(" ", tags.Select(TagFilter.ValueOf).ToArray())).ToLowerInvariant();
                         return words.All(w => hay.Contains(w));
                     });
             }
@@ -279,6 +296,9 @@ namespace HS2StudioBrowser.UI
                     q = _recent.Items.Select(k => _byKey.TryGetValue(k, out var i) ? i : null).Where(i => i != null);
                     recentOrder = true;
                     break;
+                case Scope.Marked:
+                    q = _marked.Items.Select(k => _byKey.TryGetValue(k, out var i) ? i : null).Where(i => i != null);
+                    break;
                 case Scope.Group:
                     q = _groups.TryGetValue(_scopeKey ?? "", out var g) ? g.Categories.SelectMany(c => c.Items) : Enumerable.Empty<CatalogItem>();
                     break;
@@ -287,6 +307,8 @@ namespace HS2StudioBrowser.UI
                     break;
             }
 
+            // Marked items live under "Marked for deletion" only (unless shown everywhere).
+            if (_scope != Scope.Marked && _p.HideMarked.Value && _marked.Count > 0) q = q.Where(i => !_marked.Contains(i.Key));
             var list = q.ToList();
             if (!recentOrder)
             {
@@ -295,7 +317,7 @@ namespace HS2StudioBrowser.UI
                 var index = new Dictionary<CatalogItem, int>();
                 for (var n = 0; n < list.Count; n++) index[list[n]] = n;
                 IOrderedEnumerable<CatalogItem> o = list.OrderBy(i => _scope != Scope.Favorites && _favs.Contains(i.Key) ? 0 : 1);
-                o = byName ? o.ThenBy(i => i.Name, NaturalComparer.Instance) : o.ThenBy(i => index[i]);
+                o = byName ? o.ThenBy(i => DisplayName(i), NaturalComparer.Instance) : o.ThenBy(i => index[i]);
                 list = o.ToList();
             }
             _view = list;
@@ -311,6 +333,7 @@ namespace HS2StudioBrowser.UI
             {
                 case Scope.Favorites: return "Favorites";
                 case Scope.Recent: return "Recently used";
+                case Scope.Marked: return "Marked for deletion";
                 case Scope.Group: return _groups.TryGetValue(_scopeKey ?? "", out var g) ? g.Name : "";
                 default: return _categories.TryGetValue(_scopeKey ?? "", out var c) ? c.Group.Name + "  ›  " + c.Name : "";
             }
@@ -378,6 +401,7 @@ namespace HS2StudioBrowser.UI
                 ClampRect();
                 _rect = GUI.Window(WindowId, _rect, DrawWindow, _kind.Title + "  ·  " + ScopeLabel());
                 _radial.Draw(_tagSet, _tags, _filter, () => _viewKey = null, _kind.AutoFacets, CountOf);
+                DrawDialogs();
             }
             finally
             {
@@ -572,6 +596,10 @@ namespace HS2StudioBrowser.UI
                 () => Open(Scope.Favorites, null), null);
             TreeRow(null, $"Recently used  <color={Theme.MutedHex}><size=10>{_recent.Items.Count(k => _byKey.ContainsKey(k))}</size></color>", 0,
                 !Searching && _scope == Scope.Recent, () => Open(Scope.Recent, null), null);
+            var marked = _marked.Items.Count(k => _byKey.ContainsKey(k));
+            if (marked > 0 || _scope == Scope.Marked)
+                TreeRow(null, $"<color={Theme.ErrorHex}>Marked for deletion</color>  <color={Theme.MutedHex}><size=10>{marked}</size></color>", 0,
+                    !Searching && _scope == Scope.Marked, () => Open(Scope.Marked, null), null);
             GUILayout.Space(4);
 
             if (_catalog != null)
@@ -740,7 +768,7 @@ namespace HS2StudioBrowser.UI
                 var right = (badge != null ? badge + "   " : "") + (item.Source ?? "");
                 var rightW = Mathf.Min(row.width * 0.38f, _mutedRight.CalcSize(new GUIContent(right)).x + 8);
                 var nameRect = new Rect(star.xMax + 6, row.y, row.width - (star.xMax + 6 - row.x) - rightW - 6, row.height);
-                var name = string.IsNullOrEmpty(item.Name) ? "(no name)" : item.Name;
+                var name = NameMarkup(item);
                 var tags = _tags.Get(item.Key);
                 if (tags.Count > 0)
                 {
@@ -879,10 +907,196 @@ namespace HS2StudioBrowser.UI
                         x += 13;
                     }
                 }
-                var name = string.IsNullOrEmpty(item.Name) ? "(no name)" : item.Name;
+                var name = NameMarkup(item);
                 Styles.CardName.Draw(new Rect(cell.x + 3, pic.yMax + 2, cell.width - 6, cell.height - size - 10), name, false, false, false, false);
             }
             ItemMouse(item, star, hover, e);
+        }
+
+        // ---------------------------------------------------------------- names, marking
+
+        private string DisplayName(CatalogItem i) => _names.Get(i.Key) ?? (string.IsNullOrEmpty(i.Name) ? "(no name)" : i.Name);
+
+        /// <summary>The name for a row or cell: yours if you gave one, in red when marked for deletion.</summary>
+        private string NameMarkup(CatalogItem i)
+        {
+            var name = DisplayName(i);
+            return _marked.Contains(i.Key) ? $"<color={Theme.ErrorHex}>{name}</color>" : name;
+        }
+
+        private void TryShowName(CatalogItem item, string name)
+        {
+            try { _kind.ShowNameInStudio(item, name); }
+            catch (Exception ex) { Log.Source.LogDebug("Couldn't rename in Studio's list: " + ex.Message); }
+        }
+
+        private void ToggleMarked(string key)
+        {
+            if (!_byKey.TryGetValue(key, out var item)) return;
+            var at = View().FindIndex(i => i.Key == key);
+            var on = !_marked.Contains(key);
+            _marked.Set(key, on);
+            SetStatus(on ? $"Marked for deletion: {DisplayName(item)}  ·  find it under Marked for deletion (Del there unmarks it)" : $"Unmarked: {DisplayName(item)}");
+            _viewKey = null;
+            // When it leaves the list, select the one that took its place, so Del can go down a list.
+            var view = View();
+            if (at >= 0 && !view.Any(i => i.Key == key))
+            {
+                _selected = view.Count == 0 ? null : view[Mathf.Min(at, view.Count - 1)].Key;
+                _scrollToSelected = true;
+            }
+        }
+
+        private void OpenRename(string key)
+        {
+            if (!_byKey.TryGetValue(key, out var item)) return;
+            _renameKey = key;
+            _renameText = DisplayName(item);
+            _renameFocus = true;
+        }
+
+        private void SaveRename(string name)
+        {
+            if (_renameKey == null || !_byKey.TryGetValue(_renameKey, out var item)) return;
+            name = (name ?? "").Trim();
+            var clear = name.Length == 0 || name == item.Name;
+            _names.Set(_renameKey, clear ? null : name);
+            if (_p.NamesInStudio.Value) TryShowName(item, clear ? null : name);
+            SetStatus(clear ? $"Back to its own name: {item.Name}" : $"Renamed: {item.Name} → {name}");
+            _renameKey = null;
+            _viewKey = null;
+        }
+
+        private sealed class ReportRow
+        {
+            public string Guid, Title, File, Note;
+            public int Marked, Total;
+            public bool Removable;
+            public Zipmods.Mod Mod;
+        }
+
+        /// <summary>Groups the marked items by zipmod: which mods are wholly marked and hold nothing else.</summary>
+        private void OpenReport()
+        {
+            var all = _byKey.Values.ToList();
+            var marked = _marked.Items.Select(k => _byKey.TryGetValue(k, out var i) ? i : null).Where(i => i != null).ToList();
+            var rows = new List<ReportRow>();
+            foreach (var g in marked.GroupBy(i => i.ModGuid ?? ""))
+            {
+                if (g.Key.Length == 0)
+                {
+                    rows.Add(new ReportRow { Title = "Base game", Marked = g.Count(), Total = all.Count(i => i.ModGuid == null), Note = "part of the game: can't be removed, only hidden here" });
+                    continue;
+                }
+                var mod = Zipmods.Get(g.Key);
+                var total = all.Count(i => i.ModGuid == g.Key);
+                var row = new ReportRow { Guid = g.Key, Marked = g.Count(), Total = total, Mod = mod, Title = mod?.Name ?? g.First().Source ?? g.Key };
+                if (mod == null) row.Note = "its file wasn't found in Sideloader's list";
+                else
+                {
+                    row.File = mod.RelativeFile ?? mod.File;
+                    var other = mod.OtherContent(_kind.OwnListPrefixes);
+                    if (g.Count() < total) row.Note = $"only {g.Count()} of its {total} {_kind.Nouns} marked: the zipmod stays";
+                    else if (other.Length > 0) row.Note = "all marked, but it also has " + other + ": the zipmod stays";
+                    else
+                    {
+                        row.Removable = true;
+                        row.Note = $"all {total} marked and nothing else in it: can be removed";
+                    }
+                }
+                rows.Add(row);
+            }
+            _report = rows.OrderByDescending(r => r.Removable).ThenBy(r => r.Title, StringComparer.OrdinalIgnoreCase).ToList();
+            _reportScroll = Vector2.zero;
+            _reportOpen = true;
+        }
+
+        private void MoveRemovable()
+        {
+            if (_report == null) return;
+            var moved = 0;
+            var failed = 0;
+            foreach (var r in _report.Where(x => x.Removable && x.Mod != null && x.Note != "moved"))
+            {
+                try
+                {
+                    var to = Zipmods.MoveToDeleteFolder(r.Mod);
+                    r.Note = "moved";
+                    r.File = to;
+                    moved++;
+                }
+                catch (Exception ex)
+                {
+                    r.Note = "couldn't move: " + ex.Message;
+                    failed++;
+                }
+            }
+            SetStatus(moved > 0
+                ? $"Moved {moved} zipmod{(moved == 1 ? "" : "s")} to mods_to_delete. Restart the game for them to stop loading; delete that folder when you're sure."
+                : failed > 0 ? "Nothing moved; see the report." : "Nothing to move.", moved == 0 && failed > 0);
+        }
+
+        private void DrawDialogs()
+        {
+            if (_renameKey != null)
+            {
+                var r = new Rect(_rect.x + (_rect.width - 380) / 2, _rect.y + 90, 380, 120);
+                GUI.Window(DialogId, r, id =>
+                {
+                    var e = Event.current;
+                    _byKey.TryGetValue(_renameKey ?? "", out var item);
+                    GUILayout.Space(4);
+                    GUILayout.Label(Theme.Hint("Name shown in the browser" + (_p.NamesInStudio.Value ? " and Studio's lists" : "") + (item != null ? $"  ·  originally {item.Name}" : "")), Theme.RichSingle);
+                    if (e.type == EventType.KeyDown && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)) { var t = _renameText; Later(() => SaveRename(t)); e.Use(); }
+                    if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape) { _renameKey = null; e.Use(); return; }
+                    GUI.SetNextControlName("ib_rename");
+                    _renameText = GUILayout.TextField(_renameText ?? "");
+                    if (_renameFocus && e.type == EventType.Repaint) { GUI.FocusControl("ib_rename"); _renameFocus = false; }
+                    GUILayout.Space(6);
+                    GUILayout.BeginHorizontal();
+                    if (item != null && GUILayout.Button(new GUIContent("Original name", "Use its own name again"), GUILayout.Width(110))) Later(() => SaveRename(""));
+                    GUILayout.FlexibleSpace();
+                    if (GUILayout.Button("Cancel", GUILayout.Width(70))) _renameKey = null;
+                    if (GUILayout.Button("Save", Theme.Primary, GUILayout.Width(70))) { var t = _renameText; Later(() => SaveRename(t)); }
+                    GUILayout.EndHorizontal();
+                    IMGUIUtils.EatInputInRect(new Rect(0, 0, r.width, r.height));
+                }, "Rename");
+                GUI.BringWindowToFront(DialogId);
+            }
+
+            if (_reportOpen && _report != null)
+            {
+                var r = new Rect(_rect.x + 30, _rect.y + 60, Mathf.Max(420, _rect.width - 60), Mathf.Max(260, _rect.height - 120));
+                GUI.Window(DialogId + 1, r, id =>
+                {
+                    var removable = _report.Count(x => x.Removable && x.Note != "moved");
+                    GUILayout.Label(Theme.Hint($"{_marked.Count} marked {_kind.Nouns} from {_report.Count} sources. A zipmod can only go when every {_kind.Noun} in it is marked and it holds nothing else (clothes, maps, other studio lists): otherwise removing it would take those too. Moving puts it in mods_to_delete next to mods, so it stops loading after a restart and can be put back."), Theme.Rich);
+                    _reportScroll = GUILayout.BeginScrollView(_reportScroll, GUILayout.ExpandHeight(true));
+                    foreach (var row in _report)
+                    {
+                        GUILayout.BeginVertical(Theme.Skin.box);
+                        var colour = row.Note == "moved" ? Theme.MutedHex : row.Removable ? Theme.NeonHex : Theme.TextHex;
+                        GUILayout.Label($"<color={colour}><b>{row.Title}</b></color>   " + Theme.Hint($"{row.Marked} of {row.Total} marked"), Theme.RichSingle);
+                        if (row.File != null) GUILayout.Label(Theme.Hint(row.File), Theme.RichSingle);
+                        GUILayout.Label(row.Removable || row.Note == "moved" ? row.Note : Theme.Hint(row.Note), Theme.RichSingle);
+                        GUILayout.EndVertical();
+                    }
+                    GUILayout.EndScrollView();
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button(new GUIContent("Copy report", "Copy this list to the clipboard"), GUILayout.Width(100)))
+                        GUIUtility.systemCopyBuffer = string.Join("\r\n", _report.Select(x => $"{x.Title}\t{x.Marked}/{x.Total}\t{x.File}\t{x.Note}").ToArray());
+                    GUILayout.FlexibleSpace();
+                    var was = GUI.enabled;
+                    GUI.enabled = was && removable > 0;
+                    if (GUILayout.Button(new GUIContent($"Move {removable} zipmod{(removable == 1 ? "" : "s")} to mods_to_delete", "Takes effect after a restart"), Theme.Primary, GUILayout.Width(240)))
+                        Later(MoveRemovable);
+                    GUI.enabled = was;
+                    if (GUILayout.Button("Close", GUILayout.Width(70))) _reportOpen = false;
+                    GUILayout.EndHorizontal();
+                    IMGUIUtils.EatInputInRect(new Rect(0, 0, r.width, r.height));
+                }, "Deletion report");
+                GUI.BringWindowToFront(DialogId + 1);
+            }
         }
 
         // ---------------------------------------------------------------- footer
@@ -898,7 +1112,27 @@ namespace HS2StudioBrowser.UI
             var pics = Grid ? _kind.PictureStatus : null;
             GUILayout.Label(_kind.TargetLine() + (pics != null ? Theme.Hint("  ·  " + pics) : ""), Theme.RichSingle, GUILayout.ExpandWidth(true));
 
+            if (_scope == Scope.Marked && !Searching && _marked.Count > 0)
+            {
+                if (GUILayout.Button(new GUIContent("Deletion report", "Which zipmods these come from, and which can be removed"), GUILayout.Width(110)))
+                    Later(OpenReport);
+                GUILayout.Space(6);
+            }
             var was = GUI.enabled;
+            GUI.enabled = was && _selected != null;
+            if (GUILayout.Button(new GUIContent("Rename", $"Give this {_kind.Noun} your own name (F2)"), GUILayout.Width(66)))
+            {
+                var k = _selected;
+                Later(() => OpenRename(k));
+            }
+            var isMarked = _selected != null && _marked.Contains(_selected);
+            if (GUILayout.Button(new GUIContent(isMarked ? "Unmark" : "Mark", isMarked ? "Take it off the deletion list (Del)" : $"Mark this {_kind.Noun} for deletion: it moves to Marked for deletion (Del)"), GUILayout.Width(62)))
+            {
+                var k = _selected;
+                Later(() => ToggleMarked(k));
+            }
+            GUILayout.Space(6);
+            GUI.enabled = was;
             foreach (var a in _kind.Actions.OrderBy(x => x.Primary ? 1 : 0))
             {
                 GUI.enabled = was && _selected != null && (a.CanRun == null || a.CanRun(-1));
@@ -913,8 +1147,10 @@ namespace HS2StudioBrowser.UI
             string line;
             if (_status != null && Time.unscaledTime < _statusUntil) line = _statusError ? Theme.Error(_status) : _status;
             else if (_selected != null && _byKey.TryGetValue(_selected, out var sel))
-                line = Theme.Hint($"{sel.Category.Group.Name} › {sel.Category.Name} › ") + sel.Name + (string.IsNullOrEmpty(sel.Source) ? "" : Theme.Hint("   ·   " + sel.Source))
-                    + Theme.Hint("   ·   Up / Down to step, F to star, T to tag");
+                line = Theme.Hint($"{sel.Category.Group.Name} › {sel.Category.Name} › ") + DisplayName(sel)
+                    + (_names.Get(sel.Key) != null ? Theme.Hint($"  (originally {sel.Name})") : "")
+                    + (string.IsNullOrEmpty(sel.Source) ? "" : Theme.Hint("   ·   " + sel.Source))
+                    + Theme.Hint("   ·   F2 rename, Del mark for deletion, F star, T tag");
             else line = !string.IsNullOrEmpty(GUI.tooltip) ? Theme.Hint(GUI.tooltip) : Theme.Hint((_p.PlayOnClick.Value ? $"Click a {_kind.Noun} to {_kind.Verb.ToLowerInvariant()} it" : $"Double-click a {_kind.Noun} (or Enter) to {_kind.Verb.ToLowerInvariant()} it") + "  ·  Up / Down step through the list  ·  the star (or F) adds a favorite  ·  right-click (or T) tags it");
             GUILayout.Label(line, Styles.Status, GUILayout.Height(18));
         }
@@ -930,6 +1166,22 @@ namespace HS2StudioBrowser.UI
             var page = Mathf.Max(1, Mathf.FloorToInt(_listViewH / RowH) - 1);
             switch (e.keyCode)
             {
+                case KeyCode.F2:
+                    if (_selected != null)
+                    {
+                        var key = _selected;
+                        Later(() => OpenRename(key));
+                    }
+                    e.Use();
+                    return;
+                case KeyCode.Delete:
+                    if (_selected != null)
+                    {
+                        var key = _selected;
+                        Later(() => ToggleMarked(key));
+                    }
+                    e.Use();
+                    return;
                 case KeyCode.DownArrow: StepRow(1); e.Use(); break;
                 case KeyCode.UpArrow: StepRow(-1); e.Use(); break;
                 case KeyCode.RightArrow: Step(1); e.Use(); break;

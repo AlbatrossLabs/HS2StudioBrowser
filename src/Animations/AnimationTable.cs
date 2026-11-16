@@ -1,3 +1,4 @@
+using HS2StudioBrowser.Game;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -118,6 +119,7 @@ namespace HS2StudioBrowser.Animations
                         var key = $"b:{gkv.Key}:{ckv.Key}:{akv.Key}";
                         var source = "base game";
                         var isMod = false;
+                        string guid = null;
                         if (sideloader)
                         {
                             var mod = ModOf(akv.Key, gkv.Key, ckv.Key);
@@ -126,13 +128,15 @@ namespace HS2StudioBrowser.Animations
                                 key = $"m:{mod.Value.Guid}:{mod.Value.Slot}:{gkv.Key}:{ckv.Key}";
                                 source = mod.Value.Name;
                                 isMod = true;
+                                guid = mod.Value.Guid;
                             }
                         }
                         c.Items.Add(new CatalogItem
                         {
                             Key = key,
-                            Name = akv.Value?.name ?? $"#{akv.Key}",
+                            Name = StudioNames.Original(key, akv.Value?.name) ?? $"#{akv.Key}",
                             Source = source,
+                            ModGuid = guid,
                             Tag = new Ids { Group = gkv.Key, Category = ckv.Key, No = akv.Key, Mod = isMod },
                             Order = order++,
                         });

@@ -15,7 +15,7 @@ namespace HS2StudioBrowser.Outfits
     {
         public const string Guid = "com.albatrosslabs.hs2.studiobrowser.outfits";
         public const string PluginName = "Studio Browser: Outfits";
-        public const string Version = "0.15.0";
+        public const string Version = "0.16.0";
 
         protected override StudioListKind CreateKind() => new OutfitKind();
         protected override Texture2D CreateIcon() => ToolbarIcon.Create();
