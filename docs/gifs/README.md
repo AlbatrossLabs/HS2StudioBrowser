@@ -3,12 +3,12 @@
 | Section | File | Status |
 |---|---|---|
 | Overview | `overview.gif` / `.webp` | not recorded (commented out in the README) |
-| Outfits | `OutFitBrowser.gif` | in |
-| Characters | `CharactersBrowser.webp` | in (converted from the 15 MB GIF) |
+| Outfits | `OutfitBrowser.webp` | in (converted from the 15 MB GIF) |
+| Characters | `CharacterBrowser.webp` | in (converted from the 21 MB GIF) |
 | Scenes | `SceneBrowser.gif` | in |
 | Poses | `PoseBrowser.webp` | in (converted from the 55 MB GIF) |
 | Animations | `AnimBrowser.webp` | in (converted from the 81 MB GIF) |
-| Items | `items.gif` | not recorded (commented out) |
+| Items | `ItemBrowser.gif` | in |
 | Tags | `tags.gif` | not recorded (commented out) |
 
 The original large GIFs stay on disk but are kept out of git (`.gitignore`): GitHub warns above 50 MB and refuses above 100 MB, and a README full of them loads slowly.

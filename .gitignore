@@ -5,5 +5,6 @@ obj/
 
 # Source recordings: too big for the repo (the README uses the .webp versions)
 docs/gifs/AnimBrowser.gif
-docs/gifs/CharactersBrowser.gif
+docs/gifs/CharacterBrowser.gif
+docs/gifs/OutfitBrowser.gif
 docs/gifs/PoseBrowser.gif

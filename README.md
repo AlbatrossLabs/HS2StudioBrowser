@@ -12,13 +12,13 @@ By **Albatross Labs**.
 
 Every outfit as a picture, with the folder tree on the left. Load the whole outfit, or only its clothes or only its accessories, onto the selected characters. Outfits that need zipmods you don't have get a red badge naming the missing mods.
 
-![Outfits](docs/gifs/OutFitBrowser.gif)
+![Outfits](docs/gifs/OutfitBrowser.webp)
 
 ## Characters
 
 Your character cards as pictures, split female / male. **Load** adds a character to the scene; **Change** swaps the selected character for this one and keeps their place and pose. Filter by height or bust size, worked out from each card.
 
-![Characters](docs/gifs/CharactersBrowser.webp)
+![Characters](docs/gifs/CharacterBrowser.webp)
 
 ## Scenes
 
@@ -42,7 +42,7 @@ Every animation in the game and your zipmods, searchable in one list. Each one s
 
 Studio's items as a grid of pictures, reusing Quick Access Box's thumbnails and making the missing ones. **Add** puts an item in the scene and **Add inside** puts it in the selected folder. You can give items your own names, and mark the ones you don't want so whole zipmods can be cleared out safely.
 
-<!-- ![Items](docs/gifs/items.gif) -->
+![Items](docs/gifs/ItemBrowser.gif)
 
 ## In every browser
 
