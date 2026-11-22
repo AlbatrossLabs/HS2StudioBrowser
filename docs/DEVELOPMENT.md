@@ -23,7 +23,7 @@ Requires the .NET SDK (6 or newer). References are read straight from the game i
 dotnet build -c Release
 ```
 
-Builds all seven DLLs into `bin\Release\` and copies them to `X:\HS2 RX15\BepInEx\plugins\HS2StudioBrowser\`. Point it elsewhere with `-p:HS2Dir="D:\Other\HS2"`, or add `-p:Deploy=false` to skip the copy. Build one project with e.g. `dotnet build src/Characters -c Release` (it builds Core too).
+Builds all eight DLLs into `bin\Release\` and copies them to `X:\HS2 RX15\BepInEx\plugins\HS2StudioBrowser\`. Point it elsewhere with `-p:HS2Dir="D:\Other\HS2"`, or add `-p:Deploy=false` to skip the copy. Build one project with e.g. `dotnet build src/Characters -c Release` (it builds Core too).
 
 Built against BepInEx 5.4, HS2API 1.48, Harmony 2.9, Sideloader 21.1.
 
@@ -93,6 +93,13 @@ src/Items/                      HS2StudioBrowser.Items.dll
   ItemThumbs.cs                 item pictures: Quick Access Box, thumbnail packs (Sideloader), own cache, off-screen render
   ItemPanel.cs                  the Item list: hide its three columns, close through the Add menu, add (inside a node)
   ItemIcon.cs                   box icon
+src/Maps/                       HS2StudioBrowser.Maps.dll
+  MapBrowserPlugin.cs           plugin (GUID com.albatrosslabs.hs2.studiobrowser.maps); picture settings
+  MapKind.cs                    maps as an ItemKind: Load, Picture, No map; notes each map's extras after it loads; map controls strip; automatic tags
+  MapTable.cs                   Studio's map table into the catalog, grouped by source; zipmod of each (Sideloader)
+  MapPanel.cs                   the Map list (find, hide, close through the Add menu) and the loaded map (load, options, lights, position)
+  MapShots.cs                   map pictures: hide menus/windows/gizmos/characters for a frame, read the screen, crop and scale, cache as PNG, load back; what each map has
+  MapIcon.cs                    folded-map-and-pin icon
 src/Characters/                 HS2StudioBrowser.Characters.dll
   CharacterBrowserPlugin.cs     plugin (GUID com.albatrosslabs.hs2.studiobrowser.characters)
   CharacterKind.cs              characters as a BrowserKind: Load (add) / Change (swap)

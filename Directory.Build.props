@@ -6,12 +6,12 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>$(MSBuildThisFileDirectory)bin\$(Configuration)\</OutputPath>
     <DebugType>embedded</DebugType>
-    <Version>0.17.2</Version>
+    <Version>0.20.1</Version>
     <Authors>Albatross Labs</Authors>
 
     <!--
       The game install. References are read from it (so they always match what you run), and every build
-      copies the DLLs to BepInEx\plugins\HS2StudioBrowser\ there.
+      copies the DLLs to BepInEx\plugins\AlbatrossLabs\HS2StudioBrowser\ there.
         dotnet build -c Release -p:HS2Dir="D:\Games\HoneySelect2"
       Add -p:Deploy=false to build without copying.
     -->
@@ -19,7 +19,7 @@
     <Deploy Condition="'$(Deploy)' == ''">true</Deploy>
     <Managed>$(HS2Dir)\StudioNEOV2_Data\Managed</Managed>
     <BepInEx>$(HS2Dir)\BepInEx</BepInEx>
-    <DeployDir>$(BepInEx)\plugins\HS2StudioBrowser</DeployDir>
+    <DeployDir>$(BepInEx)\plugins\AlbatrossLabs\HS2StudioBrowser</DeployDir>
   </PropertyGroup>
 
   <!-- .NET Framework reference assemblies from NuGet (skipped when FrameworkPathOverride points at a local copy). -->

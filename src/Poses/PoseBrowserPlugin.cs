@@ -15,7 +15,7 @@ namespace HS2StudioBrowser.Poses
     {
         public const string Guid = "com.albatrosslabs.hs2.studiobrowser.poses";
         public const string PluginName = "Studio Browser: Poses";
-        public const string Version = "0.17.2";
+        public const string Version = "0.20.1";
         public const string PoseToolsGuid = "com.deathweasel.bepinex.posefolders";
 
         internal ConfigEntry<bool> ShowDat;

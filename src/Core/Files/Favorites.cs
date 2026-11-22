@@ -21,6 +21,9 @@ namespace HS2StudioBrowser.Files
         public int Version { get; private set; }
         public int Count => _set.Count;
 
+        /// <summary>Every starred card, as full paths.</summary>
+        public IEnumerable<string> Paths => _set.Select(r => Path.Combine(_root, r)).ToList();
+
         public Favorites(string coordinateRoot, string file)
         {
             _root = FileOps.Normalize(coordinateRoot);

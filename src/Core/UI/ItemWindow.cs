@@ -20,7 +20,7 @@ namespace HS2StudioBrowser.UI
         private const float TreeWidth = 230f;
         private const float StarSize = 16f;
 
-        private enum Scope { Favorites, Recent, Marked, Group, Category }
+        private enum Scope { Favorites, Recent, Marked, Folder, Group, Category }
 
         private readonly StudioBrowserPlugin _p;
         private readonly ItemKind _kind;
@@ -33,6 +33,16 @@ namespace HS2StudioBrowser.UI
         private readonly HashSet<string> _filter = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly NameStore _names;
         private readonly KeyList _marked;
+        private readonly FolderList _folders;
+
+        // Folders: the new / rename box, and dragging an item onto a folder on the left.
+        private bool _folderBox;
+        private string _folderOld, _folderText, _folderAddKey;
+        private bool _folderFocus;
+        private string _pressKey, _dragKey;
+        private bool _favOpen = true;
+        private Vector2 _pressAt;
+        private readonly Dictionary<string, Rect> _folderRows = new Dictionary<string, Rect>(StringComparer.OrdinalIgnoreCase);
 
         // Rename box and deletion report (small windows over the browser).
         private string _renameKey, _renameText;
@@ -94,6 +104,7 @@ namespace HS2StudioBrowser.UI
             _radial = new TagRadial(WindowId + 3);
             _names = new NameStore(plugin.NamesFile);
             _marked = new KeyList(plugin.MarkedFile);
+            _folders = new FolderList(plugin.FoldersFile);
             foreach (var k in (_p.OpenFolders.Value ?? "").Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)) _expanded.Add(k);
         }
 
@@ -119,6 +130,13 @@ namespace HS2StudioBrowser.UI
             if (!_rectLoaded) LoadRect();
             if (_catalog == null) Rebuild();
             _visible = true;
+            // Open on what Studio is using now (the loaded map), in its own group if the current view doesn't show it.
+            var current = _kind.CurrentKey;
+            if (current != null && _byKey.TryGetValue(current, out var item))
+            {
+                if (!View().Any(i => i.Key == current)) Open(Scope.Category, item.Category.Key);
+                _selected = current;
+            }
             _scrollToSelected = true;
         }
 
@@ -130,6 +148,8 @@ namespace HS2StudioBrowser.UI
             _radial.Close();
             _renameKey = null;
             _reportOpen = false;
+            _folderBox = false;
+            _dragKey = _pressKey = null;
             _kind.OnHidden();
             SaveRect();
         }
@@ -171,12 +191,14 @@ namespace HS2StudioBrowser.UI
             foreach (var g in catalog) _groups[g.Key] = g;
             _catalog = catalog;
             _viewKey = null;
+            if (_folders.Names.Count > 0) StarFolderMembers(_byKey.Keys.ToList());
             if (_p.NamesInStudio.Value)
                 foreach (var kv in _names.All)
                     if (_byKey.TryGetValue(kv.Key, out var named)) TryShowName(named, kv.Value);
 
             // Keep the open scope if it still exists, else start on Favorites (or the first category).
             var valid = _scope == Scope.Favorites || _scope == Scope.Recent || _scope == Scope.Marked
+                || (_scope == Scope.Folder && _folders.Contains(_scopeKey))
                 || (_scope == Scope.Group && _scopeKey != null && _groups.ContainsKey(_scopeKey))
                 || (_scope == Scope.Category && _scopeKey != null && _categories.ContainsKey(_scopeKey));
             if (!valid)
@@ -271,7 +293,7 @@ namespace HS2StudioBrowser.UI
         {
             // Recently used keeps its order while it's on screen (so stepping through it doesn't reshuffle it); it catches up when reopened.
             var recentVersion = _scope == Scope.Recent && !Searching ? 0 : _recent.Version;
-            var key = $"{_scope}|{_scopeKey}|{_search}|{_p.ItemSortBy.Value}|{_favs.Version}|{recentVersion}|{_catalog?.Count}|{_tags.Version}|{string.Join("|", _filter.ToArray())}|{(_filter.Count > 0 || Searching ? _kind.AutoVersion : 0)}|{_names.Version}|{_marked.Version}|{_p.HideMarked.Value}";
+            var key = $"{_scope}|{_scopeKey}|{_search}|{_p.ItemSortBy.Value}|{_favs.Version}|{recentVersion}|{_catalog?.Count}|{_tags.Version}|{string.Join("|", _filter.ToArray())}|{(_filter.Count > 0 || Searching ? _kind.AutoVersion : 0)}|{_names.Version}|{_marked.Version}|{_folders.Version}|{_p.HideMarked.Value}";
             if (key == _viewKey) return _view;
             _viewKey = key;
 
@@ -303,6 +325,10 @@ namespace HS2StudioBrowser.UI
                     break;
                 case Scope.Marked:
                     q = _marked.Items.Select(k => _byKey.TryGetValue(k, out var i) ? i : null).Where(i => i != null);
+                    break;
+                case Scope.Folder:
+                    var folderTag = FolderList.Tag(_scopeKey ?? "");
+                    q = _byKey.Values.Where(i => _tags.Has(i.Key, folderTag));
                     break;
                 case Scope.Group:
                     q = _groups.TryGetValue(_scopeKey ?? "", out var g) ? g.Categories.SelectMany(c => c.Items) : Enumerable.Empty<CatalogItem>();
@@ -339,6 +365,7 @@ namespace HS2StudioBrowser.UI
                 case Scope.Favorites: return "Favorites";
                 case Scope.Recent: return "Recently used";
                 case Scope.Marked: return "Marked for deletion";
+                case Scope.Folder: return _scopeKey ?? "";
                 case Scope.Group: return _groups.TryGetValue(_scopeKey ?? "", out var g) ? g.Name : "";
                 default: return _categories.TryGetValue(_scopeKey ?? "", out var c) ? c.Group.Name + "  ›  " + c.Name : "";
             }
@@ -426,6 +453,7 @@ namespace HS2StudioBrowser.UI
                 });
 
             HandleKeys(e);
+            HandleDrag(e);
 
             GUILayout.BeginArea(new Rect(10, 32, _rect.width - 20, _rect.height - 42));
             DrawTopBar();
@@ -618,7 +646,14 @@ namespace HS2StudioBrowser.UI
                 };
             }
             else sel = new TagPanel.Selection { Noun = _kind.Noun };
-            _details.Draw(w, _tagSet, _tags, sel, () => _viewKey = null, () => _p.ShowDetails.Value = false);
+            var selKey = _selected;
+            var targets = sel.Targets;
+            _details.Draw(w, _tagSet, _tags, sel, () =>
+                {
+                    if (targets != null) StarFolderMembers(targets);
+                    _viewKey = null;
+                }, () => _p.ShowDetails.Value = false,
+                _folders.Facet, selKey != null ? () => Later(() => OpenFolderBox(null, selKey)) : (Action)null);
         }
 
         // ---------------------------------------------------------------- left panel
@@ -643,10 +678,29 @@ namespace HS2StudioBrowser.UI
                 _p.ShowFolders.Value = false;
             GUILayout.EndHorizontal();
 
+            var e0 = Event.current;
             _treeScroll = GUILayout.BeginScrollView(_treeScroll, false, false, GUIStyle.none, Theme.Skin.verticalScrollbar, Theme.Skin.box, GUILayout.ExpandHeight(true));
 
-            TreeRow(null, $"Favorites  <color={Theme.MutedHex}><size=10>{_favs.Count}</size></color>", 0, !Searching && _scope == Scope.Favorites,
-                () => Open(Scope.Favorites, null), null);
+            // Favorites, with your folders inside it.
+            if (e0.type == EventType.Repaint) _folderRows.Clear();
+            var favRow = TreeRow(_folders.Names.Count > 0 ? _favOpen : (bool?)null,
+                $"<color=#F5C451>★</color> Favorites  <color={Theme.MutedHex}><size=10>{_favs.Count}</size></color>", 0, !Searching && _scope == Scope.Favorites,
+                () => Open(Scope.Favorites, null), () => _favOpen = !_favOpen, null, _dragKey != null);
+            if (e0.type == EventType.Repaint) _folderRows[""] = new Rect(GUIUtility.GUIToScreenPoint(favRow.position), favRow.size);
+            if (_favOpen || _folders.Names.Count == 0)
+            {
+                foreach (var f in _folders.Names)
+                {
+                    var name = f;
+                    var tag = FolderList.Tag(name);
+                    var count = _byKey.Keys.Count(k => _tags.Has(k, tag));
+                    var row = TreeRow(null, $"{name}  <color={Theme.MutedHex}><size=10>{count}</size></color>", 1,
+                        !Searching && _scope == Scope.Folder && string.Equals(_scopeKey, name, StringComparison.OrdinalIgnoreCase),
+                        () => Open(Scope.Folder, name), null, () => OpenFolderBox(name, null), _dragKey != null);
+                    if (e0.type == EventType.Repaint) _folderRows[name] = new Rect(GUIUtility.GUIToScreenPoint(row.position), row.size);
+                }
+                TreeRow(null, Theme.Hint("+ new folder"), 1, false, () => OpenFolderBox(null, null), null);
+            }
             TreeRow(null, $"Recently used  <color={Theme.MutedHex}><size=10>{_recent.Items.Count(k => _byKey.ContainsKey(k))}</size></color>", 0,
                 !Searching && _scope == Scope.Recent, () => Open(Scope.Recent, null), null);
             var marked = _marked.Items.Count(k => _byKey.ContainsKey(k));
@@ -691,7 +745,7 @@ namespace HS2StudioBrowser.UI
         }
 
         /// <param name="open">null: no chevron; true / false: an open / closed branch.</param>
-        private void TreeRow(bool? open, string text, int depth, bool current, Action click, Action toggle)
+        private Rect TreeRow(bool? open, string text, int depth, bool current, Action click, Action toggle, Action rightClick = null, bool dropTarget = false)
         {
             var e = Event.current;
             GUILayout.BeginHorizontal();
@@ -723,9 +777,18 @@ namespace HS2StudioBrowser.UI
                 else Later(click);
                 e.Use();
             }
+            if (inView && rightClick != null && e.type == EventType.MouseDown && e.button == 1 && row.Contains(e.mousePosition))
+            {
+                Later(rightClick);
+                e.Use();
+            }
 
             if (e.type == EventType.Repaint)
-                (current ? Styles.TreeRowOn : Styles.TreeRow).Draw(row, content, inView && row.Contains(e.mousePosition), false, false, false);
+            {
+                var over = inView && row.Contains(e.mousePosition);
+                (current || (dropTarget && over) ? Styles.TreeRowOn : Styles.TreeRow).Draw(row, content, over, false, false, false);
+            }
+            return row;
         }
 
         // ---------------------------------------------------------------- list
@@ -857,6 +920,8 @@ namespace HS2StudioBrowser.UI
                 else if (e.button == 0)
                 {
                     var key = item.Key;
+                    _pressKey = key;
+                    _pressAt = GUIUtility.GUIToScreenPoint(e.mousePosition);
                     // With run-on-click the first click already ran it; a double-click mustn't run it twice (two items added).
                     if (e.clickCount == 2) { if (!_p.PlayOnClick.Value) Later(() => Run(PrimaryAction, key)); }
                     else Select(key, _p.PlayOnClick.Value);
@@ -892,7 +957,7 @@ namespace HS2StudioBrowser.UI
             const float gap = 6f;
             const float labelH = 30f;
             var size = (float)_p.ItemThumbSize.Value;
-            var cellW = size + 8f;
+            var cellW = size * _kind.PictureAspect + 8f;
             var cellH = size + 8f + labelH;
             var innerW = area.width - 16f;
             var cols = Mathf.Max(1, (int)((innerW - gap) / (cellW + gap)));
@@ -934,7 +999,7 @@ namespace HS2StudioBrowser.UI
         {
             var hover = mouseIn && cell.Contains(e.mousePosition);
             var selected = item.Key == _selected;
-            var pic = new Rect(cell.x + 4, cell.y + 4, size, size);
+            var pic = new Rect(cell.x + 4, cell.y + 4, size * _kind.PictureAspect, size);
             var star = new Rect(pic.x + 3, pic.y + 3, StarSize, StarSize);
             var fav = _favs.Contains(item.Key);
             var tex = _kind.Picture(item);   // asks for it while on screen
@@ -1089,8 +1154,138 @@ namespace HS2StudioBrowser.UI
                 : failed > 0 ? "Nothing moved; see the report." : "Nothing to move.", moved == 0 && failed > 0);
         }
 
+        // ---------------------------------------------------------------- folders
+
+        /// <summary>Drag an item from the list or grid onto a folder on the left to put it there.</summary>
+        private void HandleDrag(Event e)
+        {
+            if (e.rawType == EventType.MouseUp && e.button == 0)
+            {
+                if (_dragKey != null)
+                {
+                    var at = GUIUtility.GUIToScreenPoint(e.mousePosition);
+                    var key = _dragKey;
+                    var folder = _folderRows.FirstOrDefault(kv => kv.Value.Contains(at) && _treeViewScreen.Contains(at)).Key;
+                    if (folder != null) Later(() => AddToFolder(key, folder));
+                    e.Use();
+                }
+                _dragKey = _pressKey = null;
+                return;
+            }
+            if (e.type == EventType.MouseDrag && e.button == 0 && _pressKey != null && _dragKey == null)
+            {
+                if ((GUIUtility.GUIToScreenPoint(e.mousePosition) - _pressAt).sqrMagnitude > 64f) _dragKey = _pressKey;
+            }
+            if (_dragKey != null && e.type == EventType.Repaint && _byKey.TryGetValue(_dragKey, out var item))
+            {
+                var label = new GUIContent(DisplayName(item) + Theme.Hint("  → drop on Favorites or one of its folders"));
+                var size = Theme.RichSingle.CalcSize(label);
+                var r = new Rect(e.mousePosition.x + 14, e.mousePosition.y + 6, size.x + 16, 22);
+                GUI.Box(r, GUIContent.none);
+                GUI.Label(new Rect(r.x + 8, r.y + 2, size.x, 18), label, Theme.RichSingle);
+            }
+            if (_dragKey != null && e.type == EventType.MouseDrag) e.Use();
+        }
+
+        /// <summary>Stars the item and, with a folder name, puts it in that folder too.</summary>
+        private void AddToFolder(string key, string folder)
+        {
+            if (!_byKey.TryGetValue(key, out var item)) return;
+            if (!_favs.Contains(key)) _favs.Set(key, true);
+            if (!string.IsNullOrEmpty(folder)) _tags.Set(new[] { key }, FolderList.Tag(folder), true, _folders.Facet);
+            _viewKey = null;
+            SetStatus(string.IsNullOrEmpty(folder) ? $"Added {DisplayName(item)} to Favorites" : $"Added {DisplayName(item)} to Favorites › {folder}");
+        }
+
+        /// <summary>Anything put in one of your folders becomes a favorite too (also for folders made before they lived in Favorites).</summary>
+        private void StarFolderMembers(IEnumerable<string> keys)
+        {
+            foreach (var k in keys)
+                if (!_favs.Contains(k) && _tags.Get(k).Any(t => t.StartsWith(FolderList.Group + ":", StringComparison.OrdinalIgnoreCase)))
+                    _favs.Set(k, true);
+        }
+
+        /// <param name="existing">The folder to rename or delete (null: a new one).</param>
+        /// <param name="addKey">For a new folder: an item to put in it.</param>
+        private void OpenFolderBox(string existing, string addKey)
+        {
+            _folderBox = true;
+            _folderOld = existing;
+            _folderText = existing ?? "";
+            _folderAddKey = addKey;
+            _folderFocus = true;
+        }
+
+        private void SaveFolder()
+        {
+            var name = FolderList.Clean(_folderText);
+            if (_folderOld == null)
+            {
+                if (!_folders.Add(name))
+                {
+                    SetStatus(name.Length == 0 ? "Give the folder a name." : $"There's already a folder called {name}.", true);
+                    return;
+                }
+                if (_folderAddKey != null) AddToFolder(_folderAddKey, name);
+                else SetStatus($"New folder: Favorites › {name}  ·  click it in the details panel, or drag {_kind.Nouns} onto it");
+            }
+            else if (!string.Equals(_folderOld, name, StringComparison.Ordinal))
+            {
+                if (!_folders.Rename(_folderOld, name))
+                {
+                    SetStatus(name.Length == 0 ? "Give the folder a name." : $"There's already a folder called {name}.", true);
+                    return;
+                }
+                var oldTag = FolderList.Tag(_folderOld);
+                var keys = _byKey.Keys.Where(k => _tags.Has(k, oldTag)).ToList();
+                _tags.Set(keys, FolderList.Tag(name), true, _folders.Facet);
+                _tags.Set(keys, oldTag, false, null);
+                if (_scope == Scope.Folder && string.Equals(_scopeKey, _folderOld, StringComparison.OrdinalIgnoreCase)) _scopeKey = name;
+                SetStatus($"Renamed folder {_folderOld} to {name}");
+            }
+            _folderBox = false;
+            _viewKey = null;
+        }
+
+        private void DeleteFolder()
+        {
+            if (_folderOld == null) return;
+            var tag = FolderList.Tag(_folderOld);
+            _tags.Set(_byKey.Keys.Where(k => _tags.Has(k, tag)).ToList(), tag, false, null);
+            _folders.Remove(_folderOld);
+            if (_scope == Scope.Folder && string.Equals(_scopeKey, _folderOld, StringComparison.OrdinalIgnoreCase)) Open(Scope.Favorites, null);
+            SetStatus($"Deleted folder {_folderOld} (the {_kind.Nouns} in it stay favorites)");
+            _folderBox = false;
+            _viewKey = null;
+        }
+
         private void DrawDialogs()
         {
+            if (_folderBox)
+            {
+                var r = new Rect(_rect.x + (_rect.width - 380) / 2, _rect.y + 90, 380, 120);
+                GUI.Window(DialogId + 2, r, id =>
+                {
+                    var e = Event.current;
+                    GUILayout.Space(4);
+                    GUILayout.Label(Theme.Hint(_folderOld == null ? "Name for the new folder inside Favorites" : $"Rename {_folderOld}, or delete it (its {_kind.Nouns} stay favorites)"), Theme.RichSingle);
+                    if (e.type == EventType.KeyDown && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)) { Later(SaveFolder); e.Use(); }
+                    if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape) { _folderBox = false; e.Use(); return; }
+                    GUI.SetNextControlName("ib_folder");
+                    _folderText = GUILayout.TextField(_folderText ?? "");
+                    if (_folderFocus && e.type == EventType.Repaint) { GUI.FocusControl("ib_folder"); _folderFocus = false; }
+                    GUILayout.Space(6);
+                    GUILayout.BeginHorizontal();
+                    if (_folderOld != null && GUILayout.Button(new GUIContent("Delete folder", $"Delete the folder; the {_kind.Nouns} in it aren't touched"), GUILayout.Width(100))) Later(DeleteFolder);
+                    GUILayout.FlexibleSpace();
+                    if (GUILayout.Button("Cancel", GUILayout.Width(70))) _folderBox = false;
+                    if (GUILayout.Button(_folderOld == null ? "Create" : "Save", Theme.Primary, GUILayout.Width(70))) Later(SaveFolder);
+                    GUILayout.EndHorizontal();
+                    IMGUIUtils.EatInputInRect(new Rect(0, 0, r.width, r.height));
+                }, _folderOld == null ? "New favorites folder" : "Favorites folder");
+                GUI.BringWindowToFront(DialogId + 2);
+            }
+
             if (_renameKey != null)
             {
                 var r = new Rect(_rect.x + (_rect.width - 380) / 2, _rect.y + 90, 380, 120);

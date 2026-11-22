@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>HS2StudioBrowser.Maps</AssemblyName>
+    <RootNamespace>HS2StudioBrowser.Maps</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Core\HS2StudioBrowser.Core.csproj" />
+  </ItemGroup>
+</Project>

@@ -36,6 +36,12 @@ namespace HS2StudioBrowser
         /// <summary>Whether items have pictures (then the window offers a grid view).</summary>
         public virtual bool HasPictures => false;
 
+        /// <summary>The item Studio is using now (the loaded map...): selected when the browser opens. Null: none.</summary>
+        public virtual string CurrentKey => null;
+
+        /// <summary>Width / height of the pictures, so grid cells fit them (1: square, like items; maps are 16:9).</summary>
+        public virtual float PictureAspect => 1f;
+
         /// <summary>The item's picture if ready, else null (and it's fetched or made; called every frame it's on screen).</summary>
         public virtual UnityEngine.Texture2D Picture(CatalogItem item) => null;
 

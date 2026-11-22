@@ -4,4 +4,11 @@
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DeployDir)" />
     <Message Importance="high" Text="Deployed $(TargetFileName) to $(DeployDir)" />
   </Target>
+
+  <!-- Every Release build also keeps a copy of itself in bin\Releasev<version>\ (git-ignored): a local history of builds. -->
+  <Target Name="CopyToReleaseFolder" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <MakeDir Directories="$(MSBuildThisFileDirectory)bin\Releasev$(Version)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(MSBuildThisFileDirectory)bin\Releasev$(Version)" />
+    <Message Importance="high" Text="Copied $(TargetFileName) to bin\Releasev$(Version)" />
+  </Target>
 </Project>

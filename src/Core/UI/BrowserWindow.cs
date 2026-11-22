@@ -82,6 +82,14 @@ namespace HS2StudioBrowser.UI
         private bool _dragging;
         private List<string> _dragPaths;
         private FolderNode _dropTarget;
+
+        // Favorites and your folders inside it (the top of the tree): which one is open (null: a disk folder;
+        // "": all favorites), the rows for dropping cards on, and the one under a drag.
+        private readonly FolderList _favFolders;
+        private string _favScope;
+        private bool _favOpen = true;
+        private readonly List<KeyValuePair<Rect, string>> _favRows = new List<KeyValuePair<Rect, string>>();
+        private string _favDrop;
         private int _dragControl;
 
         // Resize
@@ -123,6 +131,7 @@ namespace HS2StudioBrowser.UI
             _tags = new TagStore(kind.Folder, _p.TagsFile);
             _tagSet = _p.CreateTagSet();
             _radial = new TagRadial(WindowId + 3);
+            _favFolders = new FolderList(plugin.FoldersFile);
             _dupes = new DuplicateFinder(kind.DuplicateKey);
             if (kind.AutoFacets != null)
                 _auto = new AutoTagIndex(kind.ReadAutoTags, kind.Folder,
@@ -389,7 +398,7 @@ namespace HS2StudioBrowser.UI
         /// </summary>
         private bool IncludeSubfoldersNow()
         {
-            if (_p.IncludeSubfolders.Value || _filter.Count > 0 || _dupeMode || _kind.ForceSubfolders) return true;
+            if (_p.IncludeSubfolders.Value || _filter.Count > 0 || _dupeMode || _kind.ForceSubfolders || _favScope != null) return true;
             var node = _index.Find(_folder);
             return node != null && node.FileCount == 0 && node.TotalCount > 0;
         }
@@ -538,7 +547,7 @@ namespace HS2StudioBrowser.UI
 
         private List<CardEntry> View()
         {
-            var key = $"{_index.Version}|{_search}|{_p.Sort.Value}|{_favs.Version}|{_onlyMissing}|{_modsVersion}|{_tags.Version}|{string.Join("|", _filter.ToArray())}|{_dupeMode}|{_dupes.Version}";
+            var key = $"{_index.Version}|{_search}|{_p.Sort.Value}|{_favs.Version}|{_onlyMissing}|{_modsVersion}|{_tags.Version}|{string.Join("|", _filter.ToArray())}|{_dupeMode}|{_dupes.Version}|{_favScope}|{_favFolders.Version}";
             if (key == _viewKey) return _view;
             _viewKey = key;
 
@@ -550,6 +559,11 @@ namespace HS2StudioBrowser.UI
                     e.FileName.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     AllTags(e).Any(tag => TagFilter.ValueOf(tag).IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0)));
             if (_filter.Count > 0) q = q.Where(e => TagFilter.Matches(AllTags(e), _filter));
+            if (_favScope != null)
+            {
+                var folderTag = _favScope.Length > 0 ? FolderList.Tag(_favScope) : null;
+                q = q.Where(e => _favs.Contains(e.Path) && (folderTag == null || _tags.Has(e.Path, folderTag)));
+            }
 
             if (_mods != null)
             {
@@ -614,7 +628,8 @@ namespace HS2StudioBrowser.UI
             try
             {
                 ClampRect();
-                var title = _kind.Title + (_index.Tree != null ? "  ·  " + FolderLabel(_folder) : "");
+                var title = _kind.Title + (_favScope != null ? "  ·  Favorites" + (_favScope.Length > 0 ? "  ›  " + _favScope : "")
+                    : _index.Tree != null ? "  ·  " + FolderLabel(_folder) : "");
                 _rect = GUI.Window(WindowId, _rect, DrawWindow, title);
 
                 if (_menuOpen)
@@ -734,7 +749,14 @@ namespace HS2StudioBrowser.UI
                 sel.Picture = _kind.HasPicture(p.Path) ? _thumbs.Get(p.Path, p.Modified) : null;
                 sel.Auto = paths.Count == 1 && _auto != null ? _auto.Get(p.Path, p.Modified) : null;
             }
-            _details.Draw(w, _tagSet, _tags, sel, TagsChanged, () => _p.ShowDetails.Value = false);
+            var targets = sel.Targets;
+            var selPaths = targets?.ToList();
+            _details.Draw(w, _tagSet, _tags, sel, () =>
+                {
+                    if (targets != null) StarFolderMembers(targets);
+                    TagsChanged();
+                }, () => _p.ShowDetails.Value = false,
+                _favFolders.Facet, selPaths != null && selPaths.Count > 0 ? () => Later(() => AskFavFolder(null, selPaths)) : (Action)null);
         }
 
         // ---------------------------------------------------------------- tags
@@ -928,7 +950,12 @@ namespace HS2StudioBrowser.UI
             GUILayout.EndHorizontal();
 
             _treeScroll = GUILayout.BeginScrollView(_treeScroll, false, false, GUIStyle.none, Theme.Skin.verticalScrollbar, Theme.Skin.box, GUILayout.ExpandHeight(true));
-            if (e.type != EventType.Layout) _treeRows.Clear();
+            if (e.type != EventType.Layout)
+            {
+                _treeRows.Clear();
+                _favRows.Clear();
+            }
+            DrawFavorites();
             if (_index.Tree != null) DrawNode(_index.Tree);
             else GUILayout.Label(_index.Scanning ? "Reading folders..." : "", Styles.Small);
             GUILayout.EndScrollView();
@@ -1009,7 +1036,7 @@ namespace HS2StudioBrowser.UI
 
             if (e.type == EventType.Repaint)
             {
-                var current = FileOps.Same(node.Path, _folder);
+                var current = _favScope == null && FileOps.Same(node.Path, _folder);
                 var drop = _dragging && _dropTarget == node;
                 var style = current || drop ? Styles.TreeRowOn : Styles.TreeRow;
                 style.Draw(row, content, row.Contains(e.mousePosition) && inView, false, false, false);
@@ -1024,7 +1051,8 @@ namespace HS2StudioBrowser.UI
 
         private void OpenFolder(string path)
         {
-            if (_folder != null && FileOps.Same(path, _folder)) return;
+            if (_folder != null && FileOps.Same(path, _folder) && _favScope == null) return;
+            _favScope = null;
             _folder = path;
             ExpandTo(path);
             RememberFolder();
@@ -1491,12 +1519,20 @@ namespace HS2StudioBrowser.UI
                     if (_pressFolder != null && _dropTarget != null &&
                         (FileOps.IsInside(_dropTarget.Path, _pressFolder.Path) || FileOps.Same(_dropTarget.Path, _pressFolder.Parent?.Path)))
                         _dropTarget = null;
+                    _favDrop = _pressFolder == null ? FavRowAt(screen) : null;
+                    if (_favDrop != null) _dropTarget = null;
                 }
                 e.Use();
             }
             else if (type == EventType.MouseUp)
             {
-                if (_dragging && _dropTarget != null)
+                if (_dragging && _favDrop != null && _dragPaths != null)
+                {
+                    var paths = _dragPaths;
+                    var folder = _favDrop;
+                    Later(() => AddToFavorites(paths, folder));
+                }
+                else if (_dragging && _dropTarget != null)
                 {
                     var target = _dropTarget.Path;
                     if (_pressFolder != null)
@@ -1523,7 +1559,8 @@ namespace HS2StudioBrowser.UI
                 if (_pressFolder != null) label = "Folder: " + _pressFolder.Name;
                 else if (_dragPaths.Count == 1) label = Path.GetFileNameWithoutExtension(_dragPaths[0]);
                 else label = $"{_dragPaths.Count} {Ns}";
-                label += _dropTarget != null ? "  →  " + (_dropTarget.Parent == null ? FolderLabel(_dropTarget.Path) : _dropTarget.Name) : "   (drop on a folder)";
+                label += _favDrop != null ? "  →  ★ " + (_favDrop.Length > 0 ? _favDrop : "Favorites")
+                    : _dropTarget != null ? "  →  " + (_dropTarget.Parent == null ? FolderLabel(_dropTarget.Path) : _dropTarget.Name) : "   (drop on a folder)";
                 var size = Styles.Ghost.CalcSize(new GUIContent(label));
                 Styles.Ghost.Draw(new Rect(e.mousePosition.x + 16, e.mousePosition.y + 6, size.x, size.y), label, false, false, false, false);
             }
@@ -1536,7 +1573,173 @@ namespace HS2StudioBrowser.UI
             _dragging = false;
             _dragPaths = null;
             _dropTarget = null;
+            _favDrop = null;
             if (GUIUtility.hotControl == _dragControl) GUIUtility.hotControl = 0;
+        }
+
+        private string FavRowAt(Vector2 screen)
+        {
+            if (!_treeViewScreen.Contains(screen)) return null;
+            foreach (var kv in _favRows)
+                if (kv.Key.Contains(screen))
+                    return kv.Value;
+            return null;
+        }
+
+        // ---------------------------------------------------------------- favorites and their folders
+
+        /// <summary>Favorites (every starred card here and in every folder inside) and your folders under it.</summary>
+        private void DrawFavorites()
+        {
+            var root = Root(_sex);
+            var favs = _favs.Paths.Where(p => FileOps.IsInside(p, root)).ToList();
+            var star = "<color=#F5C451>★</color>";
+            FavRow($"{star} Favorites  <color={Theme.MutedHex}><size=10>{favs.Count}</size></color>", 0, _favScope == "", _favFolders.Names.Count > 0 ? _favOpen : (bool?)null,
+                () => OpenFavorites(""), () => _favOpen = !_favOpen, null, "", true);
+            if (_favOpen)
+                foreach (var f in _favFolders.Names)
+                {
+                    var name = f;
+                    var tag = FolderList.Tag(name);
+                    var count = favs.Count(p => _tags.Has(p, tag));
+                    FavRow($"{name}  <color={Theme.MutedHex}><size=10>{count}</size></color>", 1,
+                        _favScope != null && string.Equals(_favScope, name, StringComparison.OrdinalIgnoreCase), null,
+                        () => OpenFavorites(name), null, () => AskFavFolder(name, null), name, false);
+                }
+            GUILayout.Space(4);
+        }
+
+        private void FavRow(string text, int depth, bool current, bool? open, Action click, Action toggle, Action right, string dropName, bool plus)
+        {
+            var e = Event.current;
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(depth * 12f);
+            var arrow = GUILayoutUtility.GetRect(16, 20, GUILayout.Width(16), GUILayout.Height(20));
+            var content = new GUIContent(text);
+            var row = GUILayoutUtility.GetRect(content, Styles.TreeRow, GUILayout.ExpandWidth(true), GUILayout.Height(20));
+            Rect add = default;
+            if (plus) add = GUILayoutUtility.GetRect(20, 20, GUILayout.Width(20), GUILayout.Height(20));
+            GUILayout.EndHorizontal();
+
+            var inView = _treeViewScreen.Contains(GUIUtility.GUIToScreenPoint(e.mousePosition));
+            if (open.HasValue && e.type == EventType.Repaint)
+            {
+                var hi = arrow.Contains(e.mousePosition) && inView;
+                var icon = open.Value ? (hi ? Styles.ChevronDownHi : Styles.ChevronDown) : (hi ? Styles.ChevronRightHi : Styles.ChevronRight);
+                GUI.DrawTexture(new Rect(arrow.x, arrow.y + 2, 16, 16), icon, ScaleMode.ScaleToFit, true);
+            }
+            if (plus && GUI.Button(add, new GUIContent("+", $"New favorites folder (put favorite {Ns} in it from the details panel, or drag them onto it)"), Styles.TreeArrow))
+                Later(() => AskFavFolder(null, null));
+
+            if (!Modal && inView && e.type == EventType.MouseDown)
+            {
+                if (open.HasValue && e.button == 0 && arrow.Contains(e.mousePosition))
+                {
+                    Later(toggle);
+                    e.Use();
+                }
+                else if (row.Contains(e.mousePosition))
+                {
+                    GUIUtility.keyboardControl = 0;
+                    if (e.button == 0) Later(click);
+                    else if (e.button == 1 && right != null) Later(right);
+                    e.Use();
+                }
+            }
+
+            if (e.type == EventType.Repaint)
+            {
+                var drop = _dragging && _favDrop != null && string.Equals(_favDrop, dropName, StringComparison.OrdinalIgnoreCase);
+                (current || drop ? Styles.TreeRowOn : Styles.TreeRow).Draw(row, content, row.Contains(e.mousePosition) && inView, false, false, false);
+            }
+            if (e.type != EventType.Layout) _favRows.Add(new KeyValuePair<Rect, string>(ToScreen(row), dropName));
+        }
+
+        /// <summary>Shows the starred cards (all, or one of your folders) from every folder.</summary>
+        private void OpenFavorites(string folder)
+        {
+            _favScope = folder;
+            _folder = Root(_sex);
+            _selected.Clear();
+            _anchor = null;
+            _gridScroll = Vector2.zero;
+            _index.Entries.Clear();
+            _viewKey = null;
+            Rescan();
+        }
+
+        /// <summary>Stars the cards and, with a folder name, puts them in that folder.</summary>
+        private void AddToFavorites(List<string> paths, string folder)
+        {
+            if (paths == null || paths.Count == 0) return;
+            _favs.Set(paths, true);
+            if (!string.IsNullOrEmpty(folder)) _tags.Set(paths, FolderList.Tag(folder), true, _favFolders.Facet);
+            _viewKey = null;
+            SetStatus((paths.Count == 1 ? Path.GetFileNameWithoutExtension(paths[0]) : $"{paths.Count} {Ns}")
+                      + (string.IsNullOrEmpty(folder) ? " added to Favorites" : $" added to Favorites › {folder}"));
+        }
+
+        /// <summary>Anything put in one of your folders becomes a favorite too.</summary>
+        private void StarFolderMembers(IEnumerable<string> paths)
+        {
+            var add = paths.Where(p => !_favs.Contains(p) && _tags.Get(p).Any(t => t.StartsWith(FolderList.Group + ":", StringComparison.OrdinalIgnoreCase))).ToList();
+            if (add.Count > 0) _favs.Set(add, true);
+        }
+
+        /// <param name="existing">Folder to rename or delete (null: a new one).</param>
+        /// <param name="add">For a new folder: cards to put in it.</param>
+        private void AskFavFolder(string existing, List<string> add)
+        {
+            _dialog = new Dialog
+            {
+                Kind = DialogKind.FavFolder,
+                Title = existing == null ? "New favorites folder" : "Favorites folder",
+                Path = existing,
+                Paths = add,
+                Text1 = existing ?? "",
+                Original1 = existing ?? "",
+            };
+        }
+
+        private void ApplyFavFolder(Dialog d)
+        {
+            var name = FolderList.Clean(d.Text1);
+            if (d.Path == null)
+            {
+                if (!_favFolders.Add(name))
+                {
+                    throw new InvalidOperationException(name.Length == 0 ? "Give the folder a name." : $"There's already a folder called {name}.");
+                }
+                _favOpen = true;
+                if (d.Paths != null && d.Paths.Count > 0) AddToFavorites(d.Paths, name);
+                else SetStatus($"New folder: Favorites › {name}");
+            }
+            else if (!string.Equals(d.Path, name, StringComparison.Ordinal))
+            {
+                if (!_favFolders.Rename(d.Path, name))
+                {
+                    throw new InvalidOperationException(name.Length == 0 ? "Give the folder a name." : $"There's already a folder called {name}.");
+                }
+                var oldTag = FolderList.Tag(d.Path);
+                var members = _favs.Paths.Where(p => _tags.Has(p, oldTag)).ToList();
+                _tags.Set(members, FolderList.Tag(name), true, _favFolders.Facet);
+                _tags.Set(members, oldTag, false, null);
+                if (_favScope != null && string.Equals(_favScope, d.Path, StringComparison.OrdinalIgnoreCase)) _favScope = name;
+                SetStatus($"Renamed folder to {name}");
+            }
+            _dialog = null;
+            _viewKey = null;
+        }
+
+        private void DeleteFavFolder(string name)
+        {
+            var tag = FolderList.Tag(name);
+            _tags.Set(_favs.Paths.Where(p => _tags.Has(p, tag)).ToList(), tag, false, null);
+            _favFolders.Remove(name);
+            if (_favScope != null && string.Equals(_favScope, name, StringComparison.OrdinalIgnoreCase)) OpenFavorites("");
+            SetStatus($"Deleted folder {name} (the {Ns} stay favorites)");
+            _dialog = null;
+            _viewKey = null;
         }
 
         private FolderNode RowAt(Vector2 screen)
@@ -1823,6 +2026,7 @@ namespace HS2StudioBrowser.UI
             Move,
             Recycle,
             Missing,
+            FavFolder,
         }
 
         private sealed class Dialog
@@ -1936,6 +2140,7 @@ namespace HS2StudioBrowser.UI
                 case DialogKind.Rename: submit = DrawRename(d, submit); break;
                 case DialogKind.NewFolder:
                 case DialogKind.RenameFolder: submit = DrawFolderName(d, submit); break;
+                case DialogKind.FavFolder: submit = DrawFavFolder(d, submit); break;
                 case DialogKind.Move: submit = DrawMove(d, submit); break;
                 case DialogKind.Recycle: submit = DrawRecycle(d, submit); break;
                 case DialogKind.Missing: submit = DrawMissing(d, submit); break;
@@ -1948,7 +2153,8 @@ namespace HS2StudioBrowser.UI
             GUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
             if (GUILayout.Button(d.Kind == DialogKind.Missing ? "Close" : "Cancel", GUILayout.Width(80))) Later(() => _dialog = null);
-            var ok = d.Kind == DialogKind.Rename ? "Rename" : d.Kind == DialogKind.NewFolder ? "Create"
+            var ok = d.Kind == DialogKind.FavFolder ? (d.Path == null ? "Create" : "Save")
+                : d.Kind == DialogKind.Rename ? "Rename" : d.Kind == DialogKind.NewFolder ? "Create"
                 : d.Kind == DialogKind.RenameFolder ? "Rename" : d.Kind == DialogKind.Move ? "Move here"
                 : d.Kind == DialogKind.Missing ? "Copy list" : "Recycle";
             var was = GUI.enabled;
@@ -2004,6 +2210,25 @@ namespace HS2StudioBrowser.UI
             {
                 d.Linked = linked;
                 if (linked) d.Text2 = FileOps.Sanitize(d.Text1);
+            }
+            return submit;
+        }
+
+        private bool DrawFavFolder(Dialog d, bool submit)
+        {
+            GUILayout.Label(d.Path == null ? "Name for the new folder inside Favorites" : $"Rename {Theme.Hint(d.Path)}, or delete it (the {Ns} in it stay favorites)", Theme.Rich);
+            GUI.SetNextControlName("ob_dlg_1");
+            var t = GUILayout.TextField(d.Text1);
+            if (t != d.Text1)
+            {
+                d.Text1 = t;
+                d.Error = null;
+            }
+            if (d.Path != null)
+            {
+                GUILayout.Space(4);
+                var name = d.Path;
+                if (GUILayout.Button(new GUIContent("Delete folder", $"Delete the folder; its {Ns} stay favorites"), GUILayout.Width(110))) Later(() => DeleteFavFolder(name));
             }
             return submit;
         }
@@ -2123,6 +2348,7 @@ namespace HS2StudioBrowser.UI
                 switch (d.Kind)
                 {
                     case DialogKind.Rename: DoRename(d); break;
+                    case DialogKind.FavFolder: ApplyFavFolder(d); break;
                     case DialogKind.NewFolder:
                     {
                         var made = FileOps.CreateFolder(d.Path, d.Text1);

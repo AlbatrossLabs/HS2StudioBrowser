@@ -34,7 +34,12 @@ namespace HS2StudioBrowser.UI
 
         /// <param name="changed">Called after a tag was put on or taken off.</param>
         /// <param name="hide">Called by the chevron that folds the panel away.</param>
-        public void Draw(float width, TagSet set, TagStore store, Selection sel, Action changed, Action hide)
+        public void Draw(float width, TagSet set, TagStore store, Selection sel, Action changed, Action hide) =>
+            Draw(width, set, store, sel, changed, hide, null, null);
+
+        /// <param name="folders">Your folders, drawn first as chips (null: none).</param>
+        /// <param name="newFolder">Called by "+ new folder" (null: no link).</param>
+        public void Draw(float width, TagSet set, TagStore store, Selection sel, Action changed, Action hide, TagFacet folders, Action newFolder)
         {
             EnsureStyles();
             GUILayout.BeginVertical(Theme.Skin.box, GUILayout.Width(width), GUILayout.ExpandHeight(true));
@@ -67,9 +72,43 @@ namespace HS2StudioBrowser.UI
             if (!string.IsNullOrEmpty(sel.Subtitle)) GUILayout.Label(sel.Subtitle, _sub, GUILayout.Width(inner));
             GUILayout.Space(6);
 
+            var n = sel.Targets.Count;
+
+            // Your folders first, if the browser has them.
+            if (folders != null)
+            {
+                GUILayout.BeginHorizontal(GUILayout.Width(inner));
+                GUILayout.Label("<color=#F5C451>★</color> Favorites folders", _group, GUILayout.ExpandWidth(true));
+                if (newFolder != null && GUILayout.Button(new GUIContent("+ new folder", "Make a folder inside Favorites and put this in it"), _link, GUILayout.ExpandWidth(false))) newFolder();
+                GUILayout.EndHorizontal();
+                if (folders.Values.Count == 0)
+                    GUILayout.Label(Theme.Hint("No folders yet. Make one here, or with + next to Favorites on the left; then click a folder to put this in it (it becomes a favorite), or drag it onto the folder."), Theme.Rich, GUILayout.Width(inner));
+                else
+                {
+                    var flow = FlowFor("\u0001folders");
+                    flow.Begin(inner);
+                    foreach (var v in folders.Values)
+                    {
+                        var tag = folders.Tag(v);
+                        var with = sel.Targets.Count(t => store.Has(t, tag));
+                        var state = with == 0 ? 0 : with == n ? 2 : 1;
+                        var content = new GUIContent(state == 1 ? $"<color={Theme.NeonHex}>{v}</color>" : v,
+                            state == 2 ? "In this folder: click to take it out (it stays a favorite)" : "Click to put it in this folder (and make it a favorite)");
+                        flow.Next(Flow.Size(content, Theme.Choice));
+                        var on = GUILayout.Toggle(state == 2, content, Theme.Choice, GUILayout.ExpandWidth(false));
+                        if (on != (state == 2))
+                        {
+                            store.Set(sel.Targets, tag, state != 2, folders);
+                            changed();
+                        }
+                    }
+                    flow.End();
+                }
+                GUILayout.Space(8);
+            }
+
             // Tags, group by group.
             set.Refresh();
-            var n = sel.Targets.Count;
             foreach (var f in set.Facets)
             {
                 var onCount = sel.Targets.Count(t => store.Get(t).Any(x => x.StartsWith(f.Name + ":", StringComparison.OrdinalIgnoreCase)));

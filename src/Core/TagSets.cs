@@ -139,6 +139,15 @@ namespace HS2StudioBrowser
             "Scale (one): Small prop, Furniture, Set piece, Environment\n" +
             "Kit: Bedroom set, Bar, Lab, Office set, Bathroom set\n";
 
+        public const string Maps = Header +
+            "# Automatic groups (in the filter wheel): Source (base game or a mod), Extras (option objects, lights, water; known once a map has been loaded), Picture.\n" +
+            "# Shared groups (Project, Rating, Use) come from HS2StudioBrowser.shared.tagset.txt.\n\n" +
+            "Place: Bedroom, Bathroom, Living room, Kitchen, Office, Classroom, Hospital, Hotel, Club, Bar, Gym, Pool, Beach, Onsen, Street, Park, Forest, Studio, Fantasy\n" +
+            "Setting (one): Indoor, Outdoor, Both\n" +
+            "Mood: Cozy, Luxury, Romantic, Gritty, Dark, Bright, Neon, Sci-fi, Horror\n" +
+            "Size (one): Room, Building, Open area\n" +
+            "Time of day: Day, Sunset, Night\n";
+
         public const string Animations = Header +
             "# Automatic groups (in the filter wheel, measured): Length (Pose, Under 2 s, 2-10 s, Over 10 s), Playback (Loop, Once), Source (base game or a mod).\n" +
             "# Shared groups (Project, Status, Use) come from HS2StudioBrowser.shared.tagset.txt.\n\n" +

@@ -109,6 +109,7 @@ namespace HS2StudioBrowser
 
         /// <summary>Your names for catalog items, and items marked for deletion.</summary>
         public string NamesFile => Path.Combine(Paths.ConfigPath, $"HS2StudioBrowser.{Kind.Id}.names.txt");
+        public string FoldersFile => Path.Combine(Paths.ConfigPath, $"HS2StudioBrowser.{Kind.Id}.folders.txt");
         public string MarkedFile => Path.Combine(Paths.ConfigPath, $"HS2StudioBrowser.{Kind.Id}.marked.txt");
 
         public string FavoritesFile => Path.Combine(Paths.ConfigPath, $"HS2StudioBrowser.{Kind.Id}.favorites.txt");
@@ -309,9 +310,12 @@ namespace HS2StudioBrowser
             _window.Update();
         }
 
+        /// <summary>While true, no browser window draws (a picture is being read off the screen).</summary>
+        public static bool HideWindows;
+
         protected virtual void OnGUI()
         {
-            if (!StudioAPI.StudioLoaded) return;
+            if (!StudioAPI.StudioLoaded || HideWindows) return;
             _window.Draw();
         }
 

@@ -4,7 +4,7 @@
 
 Cohesive method to select, sort, and organize all studio items.
 
-Studio Browser replaces Honey Select 2 Studio's plain text lists with browsers you can actually find things in: pictures, folders, search, favorites and tags. There are six browsers, one each for outfits, characters, scenes, poses, animations and items. Install only the ones you want.
+Studio Browser replaces Honey Select 2 Studio's plain text lists with browsers you can actually find things in: pictures, folders, search, favorites and tags. There are seven browsers, one each for outfits, characters, scenes, poses, animations, items and maps. Install only the ones you want.
 
 By **Albatross Labs**.
 
@@ -46,11 +46,17 @@ Studio's items as a grid of pictures, reusing Quick Access Box's thumbnails and 
 
 ![Items](docs/gifs/ItemBrowser.gif)
 
+## Maps
+
+Studio's maps as pictures, grouped by the base game and each mod author. Load a map, frame a view you like and press **Picture**: it saves exactly what's on screen, with the menus and characters left out. The map's Options and Lights switches are built in, and you can filter for maps with water, lights or optional props.
+
+<!-- ![Maps](docs/gifs/MapBrowser.webp) -->
+
 ## In every browser
 
 - **Tags without typing:** press T for a tag wheel, or click tags in the details panel on the right. Each browser has its own groups, such as color, theme and risqué level for outfits, plus shared **Project**, **Rating** and **Use** groups. Filter by any mix of them.
 - **Automatic tags:** worked out from the files themselves, such as which clothing slots an outfit uses, a scene's cast or an animation's length.
-- **Favorites, search and recently used,** in every browser.
+- **Favorites with your own folders,** in every browser: star something, then sort your favorites into folders (click a folder in the details panel or drag onto it). Plus search and recently used.
 - **Duplicates:** finds copies even when the file names and pictures differ, and keeps your stars and tags on the copy you keep.
 - **Rename and move** cards from the browser. The name inside the card changes too, and the rest of the card is left byte for byte.
 - **Safe deleting:** cards go to the Recycle Bin, and nothing is ever deleted outright.
@@ -68,6 +74,7 @@ Studio Browser covers what these plugins do in Studio. You can remove them, or k
 | **Studio Character Sort** | Sorting characters by name, file, newest or oldest | Nothing in Studio |
 | **Quick Access Box** | Browsing and searching items, favorites, recently used, item pictures | Its pop-up search box. If installed, the Items browser reuses its thumbnails |
 | **Browser Folders** | Folders for outfits, characters and scenes in Studio | The character maker and the main game. Studio Browser keeps its scene save folder in step |
+| **Studio Misc Search** | Searching maps | Its search boxes for backgrounds and music (BGM, ENV) |
 | **Pose Preview** | Pose pictures (and a *No picture* list to make them) | Hover previews of animations, and its hand browser |
 
 ## Install
@@ -84,12 +91,23 @@ Studio Browser covers what these plugins do in Studio. You can remove them, or k
 | Poses | character › Kinematics › Pose | Ctrl+Shift+P |
 | Animations | Anim › character › Animations | Ctrl+Shift+M |
 | Items | Add › Item | Ctrl+Shift+I |
+| Maps | Add › Map | Ctrl+Shift+G |
 
 Settings are under F1 › *Studio Browser: …*.
+
+## Modder support
+
+Mod authors can make their items, maps and animations show up with pictures, clean names and tags in Studio Browser by adding a few optional files to their zipmod. Mods without them work exactly the same.
+
+- **Works today:** item pictures in Quick Access Box's thumbnail format, read straight from the zipmod.
+- **Planned:** a `studiobrowser/` picture folder in the zipmod, names and tags in `manifest.xml`, creator tags carried in cards, and an **Export for this mod** button that writes the pictures and manifest section for you.
+
+The format and examples are in [docs/MODDERS.md](docs/MODDERS.md).
 
 ## More
 
 - [Full guide](docs/GUIDE.md): every button, setting and file, browser by browser.
 - [Development](docs/DEVELOPMENT.md): how it works inside, building from source, and the source map.
+- [Modder support](docs/MODDERS.md): adding pictures, names and tags to your zipmod.
 
 MIT License.

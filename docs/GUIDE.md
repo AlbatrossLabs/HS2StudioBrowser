@@ -26,6 +26,11 @@ Used when installed, never required: **Quick Access Box** (item pictures), **Acc
 - **Folder tree** (left): click a folder to show its cards. The chevron opens or closes a folder's subfolders (double-click the name does the same); right-click › *Expand all* / *Collapse all* does a whole branch. Open folders are remembered. The number is how many cards are in that folder, subfolders included. A folder whose cards are all in its subfolders shows them when opened, as if *Subfolders* were ticked. The double chevron at the top folds the panel away for more thumbnail room.
 - **Thumbnails** (right): the name stored in the card (what Studio's list shows), with the file name under it when the two differ. Search matches either. Sort by *Name*, *File*, *Newest* or *Oldest*. The slider sets the picture size. Tick *Subfolders* to also show cards in the folders inside the open one.
 - **Favorites**: right-click › *Add to favorites*, or click the star in a thumbnail's top-left corner (it shows on hover). Favorites sit at the top of every folder under a *Favorites* heading, the rest below, each part in the chosen order.
+- **Favorites in the tree**: **★ Favorites** at the top of the folder tree shows every starred card, from this folder and every folder inside it. Your own folders sit under it, to sort favorites further:
+  - **New folder**: **+** on the Favorites row, or *+ new folder* in the details panel (which also puts the selected cards in it).
+  - **Put cards in**: click the folder's chip in the details panel, or drag cards onto the folder (or onto Favorites itself to just star them). A card put in a folder becomes a favorite; it can be in several folders.
+  - **Open, rename, delete**: click a folder to see its cards; right-click it to rename or delete. Deleting a folder leaves its cards favorites.
+  - The folder list is kept in `BepInEx\config\HS2StudioBrowser.<kind>.folders.txt`; which cards are in which folder is kept with the tags (`Folder:<name>`), so it follows renames and moves made in the browser.
 - **Missing zipmods**: cards that use zipmods you don't have get a red **!** badge; hovering one names the missing mods in the footer. Tick **Missing mods** at the top to show only those. Right-click › **Missing mods...** lists each missing zipmod with its author, GUID and website, which part uses it, and whether it's *not installed* or *installed, outdated* (you have the mod, but your version lacks that item). With several cards selected it adds up which mods are needed and by how many cards. **Copy list** puts it on the clipboard. Right-click on empty space › *Select ... with missing mods*, then drag them onto a folder to sort them out in one go.
 - **Arrow keys** move the selection through the grid (Up / Down by row, across Favorites and the rest; Page Up / Down, Home / End). In the Poses browser they also try each pose on.
 - **Select**: click. **Ctrl+click** adds or removes one, **Shift+click** selects a range, **Ctrl+A** selects all, click empty space to clear.
@@ -132,6 +137,32 @@ The same list as Animations (groups and categories on the left with Favorites an
 - Items from Accessories to Studio Items show up in its own group like any other.
 - **Stay open after adding** (F1, on by default; Items and Characters): adding from the browser keeps Studio's Add menu, and so the browser, open even when Studio's option to close the menu after adding is on. Off: Studio's option decides, as in its own lists. Adding from Studio's own lists is unchanged.
 - Favorites, tags and Recently used (the last 40 added) are stored by the zipmod's GUID and its own item number, so they survive adding or removing other mods.
+
+### Maps
+
+The same list as Items (Favorites, Recently used, search, stars, tags, the details panel, rename and mark for deletion), for Studio's maps. Studio's own Map list has no groups, so the left panel groups maps by where they come from: **Base game**, then **Mods** with one entry per mod author.
+
+| Button | Does |
+|---|---|
+| **Load** (double-click, Enter) | Loads the map into the scene, replacing the current one, as Studio's Map list does |
+| **Picture** | Gives the map that's loaded now a picture of exactly what's on screen (menus and characters left out). Frame the camera first; it replaces the map's picture |
+| **No map** | Clears the scene's map (Studio's list's top entry) |
+
+- **Pictures**: load a map, frame the view you like and press **Picture**. For one frame Studio's menus, the browser windows, the move gizmos and the characters (F1 › *Leave characters out*) are hidden, the screen is read exactly as it looks (your graphics plugin's lighting and exposure included), and everything comes back. The picture is cropped to 16:9 from the middle and saved at 640 × 360. Pictures are kept in `BepInEx\cache\HS2StudioBrowser.maps.pictures`, by the zipmod's GUID and its own map number, so they survive adding or removing other mods. Press Picture again any time to replace one. *Picture: No picture* in the filter wheel lists the maps still to do.
+- **Map controls** (the strip under the grid): the loaded map's name, its **Options** switch (the props a map can show or hide) and **Lights** switch (its own lamps), each greyed out when the map has none, and **Reset position** when the map was moved or turned in Studio's map settings. Studio's own map panel is kept in step.
+- **Automatic tags**: **Source** (Base game, Mod), **Extras** (Options, Lights, Water, None; learned when a map loads, kept in `BepInEx\cache\HS2StudioBrowser.maps.info.txt`) and **Picture** (Has picture, No picture). Filter by *Picture: No picture* to see which maps still need one.
+- **Your tags** start with Place, Setting, Mood, Size and Time of day, plus the shared Project, Rating and Use groups.
+- **Load** waits for a double-click, Enter or the button (a map takes a few seconds to load), and the arrow keys only move through the list. *Stay open after adding* (F1) keeps Studio's Add menu and the browser open after a load.
+- **Deletion report**: a map zipmod can be moved to `mods_to_delete` when all its maps are marked and it holds nothing else.
+
+### Favorites folders (Items, Animations, Maps)
+
+The list browsers get the same favorites folders as the card browsers: **★ Favorites** in the left panel, your folders inside it (the chevron folds them), and *+ new folder* at the end.
+
+- **Put things in**: click the folder's chip in the details panel, or drag an item from the list or grid onto the folder (or onto Favorites to just star it). Anything put in a folder becomes a favorite; an item can be in several folders.
+- **Rename or delete**: right-click the folder. Deleting a folder leaves its items favorites.
+- Folders made before 0.20 (when they had their own section) move under Favorites, and what's in them is starred.
+- Kept in `BepInEx\config\HS2StudioBrowser.<kind>.folders.txt`; membership is stored with the tags (`Folder:<name>`), by the same ids as favorites.
 
 ### Rename and mark for deletion (Items, Animations)
 
