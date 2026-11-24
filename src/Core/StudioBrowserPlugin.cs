@@ -66,6 +66,9 @@ namespace HS2StudioBrowser
         public bool WindowVisible => _window != null && _window.Visible;
 
         /// <summary>Hides the browser window (as if the user closed it, without closing Studio's list).</summary>
+        /// <summary>Files changed outside the browser: the open window re-reads them.</summary>
+        public void FilesChanged() => _window?.FilesChanged();
+
         public void HideWindow()
         {
             _window?.Hide();

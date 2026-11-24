@@ -78,6 +78,21 @@
   .social .by { position: absolute; left: 64px; bottom: 34px; }
   .social .girl { width: 460px; right: 10px; top: 8px; }
   .social .window { width: 290px; left: 548px; top: 372px; transform: perspective(1400px) rotateY(-10deg) rotateZ(-2deg); }
+
+  /* Social post, 3:2, 1200 x 800 */
+  .social32 { width: 1200px; height: 800px; }
+  .social32 .glow.c { width: 600px; height: 420px; left: -160px; top: -110px; }
+  .social32 .glow.p { width: 620px; height: 760px; right: -70px; top: 50px; }
+  .social32 .brand { left: 64px; top: 70px; width: 660px; }
+  .social32 .studio { font-size: 96px; }
+  .social32 .plate { height: 92px; padding: 0 22px; }
+  .social32 .browser { font-size: 66px; }
+  .social32 .underline { width: 420px; }
+  .social32 .tagline { font-size: 26px; max-width: 600px; }
+  .social32 .chips { max-width: 720px; }
+  .social32 .by { position: absolute; left: 64px; bottom: 30px; }
+  .social32 .girl { width: 560px; right: 14px; top: 24px; }
+  .social32 .window { width: 300px; left: 120px; top: 392px; transform: perspective(1400px) rotateY(-10deg) rotateZ(-2deg); }
 </style>
 </head>
 <body>
@@ -87,7 +102,7 @@ const layout = new URLSearchParams(location.search).get('layout') || 'banner';
 const chips = `
   <div class="chips">
     <div class="chip on">Outfits</div><div class="chip">Characters</div><div class="chip">Scenes</div>
-    <div class="chip">Poses</div><div class="chip">Animations</div><div class="chip">Items</div>
+    <div class="chip">Poses</div><div class="chip">Animations</div><div class="chip">Items</div><div class="chip">Maps</div>
     <div class="chip pk">Tags · Ratings · Duplicates</div>
   </div>`;
 const brand = (tag) => `

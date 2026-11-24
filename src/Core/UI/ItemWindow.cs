@@ -110,6 +110,8 @@ namespace HS2StudioBrowser.UI
 
         public bool Visible => _visible;
 
+        public void FilesChanged() { }
+
         private static float GuiWidth => Screen.width / Mathf.Max(0.01f, GUI.matrix.m00);
         private static float GuiHeight => Screen.height / Mathf.Max(0.01f, GUI.matrix.m11);
 

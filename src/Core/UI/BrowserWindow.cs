@@ -172,6 +172,11 @@ namespace HS2StudioBrowser.UI
 
         public bool Visible => _visible;
 
+        public void FilesChanged()
+        {
+            if (_visible) Later(Rescan);
+        }
+
         private bool Modal => _dialog != null;
 
         // Screen size in GUI units (differs from pixels when an IMGUI scaling plugin sets GUI.matrix).

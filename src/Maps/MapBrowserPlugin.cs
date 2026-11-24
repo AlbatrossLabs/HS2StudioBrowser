@@ -16,7 +16,7 @@ namespace HS2StudioBrowser.Maps
     {
         public const string Guid = "com.albatrosslabs.hs2.studiobrowser.maps";
         public const string PluginName = "Studio Browser: Maps";
-        public const string Version = "0.20.1";
+        public const string Version = "0.22.0";
 
         internal ConfigEntry<bool> HideCastInPictures;
 

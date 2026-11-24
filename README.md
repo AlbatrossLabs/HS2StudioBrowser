@@ -24,7 +24,7 @@ Your character cards as pictures, split female / male. **Load** adds a character
 
 ## Scenes
 
-Stands in for Studio's Load screen, with every subfolder browsable. Load or Import a scene, filter by who's in it (FF, MMF, 4+...), and scenes go to the Recycle Bin when deleted.
+Stands in for Studio's Load screen, with every subfolder browsable. Load or Import a scene, filter by who's in it (FF, MMF, 4+...), and scenes go to the Recycle Bin when deleted. System › Save puts the new scene next to the one you loaded and asks what to call it.
 
 ![Scenes](docs/gifs/SceneBrowser.gif)
 
@@ -36,7 +36,7 @@ Pose pictures in a grid, `.dat` poses included. Use the arrow keys to try each p
 
 ## Animations
 
-Every animation in the game and your zipmods, searchable in one list. Each one shows how long it runs and flags the ones that are really a held pose. Studio's speed, pattern and loop controls are built in, plus a timeline to scrub to any frame.
+Every animation in the game and your zipmods, searchable in one list. Each one shows how long it runs and flags the ones that are really a held pose. Studio's speed, pattern and loop controls are built in, plus one-click FK / IK / Off switches and a timeline to scrub to any frame.
 
 ![Animations](docs/gifs/AnimBrowser.webp)
 

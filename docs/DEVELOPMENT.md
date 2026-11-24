@@ -23,7 +23,7 @@ Requires the .NET SDK (6 or newer). References are read straight from the game i
 dotnet build -c Release
 ```
 
-Builds all eight DLLs into `bin\Release\` and copies them to `X:\HS2 RX15\BepInEx\plugins\HS2StudioBrowser\`. Point it elsewhere with `-p:HS2Dir="D:\Other\HS2"`, or add `-p:Deploy=false` to skip the copy. Build one project with e.g. `dotnet build src/Characters -c Release` (it builds Core too).
+Builds all eight DLLs, copies them to `X:\HS2 RX15\BepInEx\plugins\AlbatrossLabs\HS2StudioBrowser\`, and keeps a copy of each Release build in `bin\Releasev<version>\` (git-ignored), so older builds stay at hand. Point it elsewhere with `-p:HS2Dir="D:\Other\HS2"`, or add `-p:Deploy=false` to skip the copy. Build one project with e.g. `dotnet build src/Characters -c Release` (it builds Core too).
 
 Built against BepInEx 5.4, HS2API 1.48, Harmony 2.9, Sideloader 21.1.
 

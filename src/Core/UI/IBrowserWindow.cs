@@ -14,5 +14,7 @@ namespace HS2StudioBrowser.UI
         void FollowSex(int sex);
         void Update();
         void Draw();
+        /// <summary>Files changed outside the browser (a scene saved): re-read them if the window is open.</summary>
+        void FilesChanged();
     }
 }

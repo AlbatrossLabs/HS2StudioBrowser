@@ -70,6 +70,7 @@ namespace HS2StudioBrowser.Animations
             GUILayout.Label("Animation controls" + (first != null ? Theme.Hint($"   {Describe(chars)}") : Theme.Hint("   select a character")), _header, GUILayout.ExpandWidth(true));
             if (!open && first != null)
                 GUILayout.Label($"speed {first.animeSpeed:0.00}  ·  {TimeText(first)}", _value, GUILayout.ExpandWidth(false));
+            DrawKinematics(chars);
             GUILayout.EndHorizontal();
 
             if (open)
@@ -138,6 +139,86 @@ namespace HS2StudioBrowser.Animations
                 RefreshStudioBox();
             }
             GUILayout.EndVertical();
+        }
+
+        /// <summary>
+        /// FK and IK for the selected characters, always in the header (folded or not). Studio keeps them
+        /// exclusive: turning one on turns the other off. Lit: on for every selected character; neon text: on
+        /// for some of them (a click turns it on for all).
+        /// </summary>
+        private void DrawKinematics(OCIChar[] chars)
+        {
+            var was = GUI.enabled;
+            GUI.enabled = was && chars.Length > 0;
+            GUILayout.Space(8);
+            OffButton(chars);
+            KinematicButton(chars, OICharInfo.KinematicMode.FK, "FK", "Forward kinematics: pose each bone by rotating it (Studio's Kinematics › FK)");
+            KinematicButton(chars, OICharInfo.KinematicMode.IK, "IK", "Inverse kinematics: pose by dragging hands, feet and body (Studio's Kinematics › IK)");
+            GUI.enabled = was;
+        }
+
+        private void KinematicButton(OCIChar[] chars, OICharInfo.KinematicMode mode, string text, string tip)
+        {
+            var on = chars.Count(c => IsOn(c, mode));
+            var all = chars.Length > 0 && on == chars.Length;
+            var label = on > 0 && !all ? $"<color={Theme.NeonHex}>{text}</color>" : text;
+            var now = GUILayout.Toggle(all, new GUIContent(label, tip + (on > 0 && !all ? $"\nOn for {on} of {chars.Length}: click to turn it on for all" : "")),
+                Theme.Choice, GUILayout.Width(34), GUILayout.Height(20));
+            if (now == all) return;
+            foreach (var c in chars)
+            {
+                try
+                {
+                    if (IsOn(c, mode) != now) c.ActiveKinematicMode(mode, now, false);
+                }
+                catch (Exception ex)
+                {
+                    Log.Source.LogDebug($"Couldn't switch {text}: {ex.Message}");
+                }
+            }
+            RefreshKinematicsPanel(chars);
+        }
+
+        /// <summary>Both off, so the animation moves the character again. Lit when neither is on for anyone selected.</summary>
+        private void OffButton(OCIChar[] chars)
+        {
+            var off = chars.Count(c => !c.oiCharInfo.enableFK && !c.oiCharInfo.enableIK);
+            var all = chars.Length > 0 && off == chars.Length;
+            var label = off > 0 && !all ? $"<color={Theme.NeonHex}>Off</color>" : "Off";
+            var now = GUILayout.Toggle(all, new GUIContent(label, "FK and IK off: the animation moves the character" +
+                (off > 0 && !all ? $"\nOff for {off} of {chars.Length}: click to turn them off for all" : "")), Theme.Choice, GUILayout.Width(38), GUILayout.Height(20));
+            if (!now || all) return;
+            foreach (var c in chars)
+            {
+                try
+                {
+                    if (c.oiCharInfo.enableFK) c.ActiveKinematicMode(OICharInfo.KinematicMode.FK, false, false);
+                    if (c.oiCharInfo.enableIK) c.ActiveKinematicMode(OICharInfo.KinematicMode.IK, false, false);
+                }
+                catch (Exception ex)
+                {
+                    Log.Source.LogDebug("Couldn't turn FK / IK off: " + ex.Message);
+                }
+            }
+            RefreshKinematicsPanel(chars);
+        }
+
+        private static bool IsOn(OCIChar c, OICharInfo.KinematicMode mode) =>
+            mode == OICharInfo.KinematicMode.FK ? c.oiCharInfo.enableFK : c.oiCharInfo.enableIK;
+
+        /// <summary>Studio's Kinematics panel (if it shows one of these characters) catches up with the change.</summary>
+        private static void RefreshKinematicsPanel(OCIChar[] chars)
+        {
+            try
+            {
+                foreach (var mp in UnityEngine.Object.FindObjectsOfType<MPCharCtrl>())
+                    if (mp != null && chars.Contains(mp.ociChar))
+                        HarmonyLib.AccessTools.Method(typeof(MPCharCtrl), "UpdateInfo")?.Invoke(mp, null);
+            }
+            catch (Exception ex)
+            {
+                Log.Source.LogDebug("Couldn't refresh Studio's Kinematics panel: " + ex.Message);
+            }
         }
 
         private static string Describe(OCIChar[] chars) => chars.Length == 1 ? Game.StudioTargets.NameOf(chars[0]) : $"{chars.Length} characters";

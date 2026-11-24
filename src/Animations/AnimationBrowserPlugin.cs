@@ -16,7 +16,7 @@ namespace HS2StudioBrowser.Animations
     {
         public const string Guid = "com.albatrosslabs.hs2.studiobrowser.animations";
         public const string PluginName = "Studio Browser: Animations";
-        public const string Version = "0.20.1";
+        public const string Version = "0.22.0";
 
         internal ConfigEntry<bool> MeasureLengths;
         internal ConfigEntry<bool> ShowControls;

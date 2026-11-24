@@ -16,7 +16,7 @@ namespace HS2StudioBrowser.Items
     {
         public const string Guid = "com.albatrosslabs.hs2.studiobrowser.items";
         public const string PluginName = "Studio Browser: Items";
-        public const string Version = "0.20.1";
+        public const string Version = "0.22.0";
 
         protected override StudioListKind CreateKind() => new ItemBrowserKind();
         protected override Texture2D CreateIcon() => ItemIcon.Create();

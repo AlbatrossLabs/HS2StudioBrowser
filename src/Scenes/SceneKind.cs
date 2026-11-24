@@ -134,6 +134,7 @@ namespace HS2StudioBrowser.Scenes
 
         public override void Install(Harmony harmony)
         {
+            SaveFolder.Install(harmony, _plugin, Root(0));
             // Hide Studio's Load screen the moment it's created, so it doesn't show for a few frames first.
             LoadScreen.ShouldHideOnOpen = () => _plugin.ReplaceStudioList.Value && !CameraSweepBridge.Picking();
             try
@@ -174,6 +175,7 @@ namespace HS2StudioBrowser.Scenes
         /// </summary>
         public override void OnFolderChanged(string folder)
         {
+            SaveFolder.FolderOpened(folder);
             if (!_plugin.SyncSaveFolder.Value || string.IsNullOrEmpty(folder)) return;
             try
             {
